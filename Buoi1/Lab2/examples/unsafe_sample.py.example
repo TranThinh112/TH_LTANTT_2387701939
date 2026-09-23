@@ -1,0 +1,4 @@
+# File cố ý chứa dữ liệu rủi ro để kiểm thử scanner, không dùng trong production
+API_KEY = "abcd1234abcd1234abcd1234"
+password = "SuperSecret123"
+username = "admin_user"

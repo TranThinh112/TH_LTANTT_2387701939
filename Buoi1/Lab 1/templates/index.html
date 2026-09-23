@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SecureValidator</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #f4f4f4;
+      --panel: #101820;
+      --panel-soft: #121d26;
+      --border: #243848;
+      --text: #d9e3ea;
+      --muted: #7f8d98;
+      --accent: #12a8d2;
+      --accent-dark: #0d8db3;
+      --success: #33d17a;
+      --danger: #ff6b6b;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      padding: 14px 18px 42px;
+    }
+
+    .page {
+      width: min(740px, 100%);
+      background: var(--panel);
+      padding: 28px 32px 34px;
+      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.28);
+    }
+
+    h1 {
+      margin: 0 0 44px;
+      text-align: center;
+      font-size: 34px;
+      line-height: 1.2;
+      color: #f2f6f8;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      text-shadow: 0 1px 2px rgba(255, 255, 255, 0.2);
+    }
+
+    .field { margin-bottom: 24px; }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 18px;
+      font-weight: 700;
+      color: #b9c7d1;
+    }
+
+    input {
+      width: 100%;
+      height: 60px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: #0f171e;
+      color: var(--text);
+      padding: 0 18px;
+      font-size: 18px;
+      outline: none;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02), 0 0 0 1px rgba(0, 0, 0, 0.22);
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    input::placeholder { color: var(--muted); }
+
+    input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(18, 168, 210, 0.18);
+    }
+
+    button {
+      width: 100%;
+      height: 58px;
+      margin-top: 1px;
+      border: 0;
+      border-radius: 4px;
+      background: var(--accent);
+      color: white;
+      font-size: 18px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: background 0.15s ease, transform 0.05s ease;
+    }
+
+    button:hover { background: var(--accent-dark); }
+    button:active { transform: translateY(1px); }
+
+    .result-card {
+      display: none;
+      margin-top: 24px;
+      padding: 18px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--panel-soft);
+    }
+
+    .result-card.visible { display: block; }
+
+    .result-card h2 {
+      margin: 0 0 14px;
+      font-size: 20px;
+      color: #f2f6f8;
+    }
+
+    .result-list {
+      display: grid;
+      gap: 10px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .result-item {
+      display: grid;
+      grid-template-columns: 110px 1fr;
+      gap: 12px;
+      align-items: start;
+      padding: 10px 12px;
+      border-radius: 4px;
+      background: #0d141a;
+      font-size: 15px;
+    }
+
+    .badge {
+      display: inline-block;
+      font-weight: 800;
+    }
+
+    .ok { color: var(--success); }
+    .bad { color: var(--danger); }
+    code { color: #dce8ef; word-break: break-word; }
+
+    @media (max-width: 640px) {
+      body { padding: 0; }
+      .page { padding: 24px 20px 30px; }
+      h1 { font-size: 30px; margin-bottom: 32px; }
+      .result-item { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <h1>SecureValidator</h1>
+
+    <form id="validator-form">
+      <div class="field">
+        <label for="email">Email:</label>
+        <input id="email" name="email" type="text" placeholder="you@example.com" autocomplete="off">
+      </div>
+
+      <div class="field">
+        <label for="url">URL:</label>
+        <input id="url" name="url" type="text" placeholder="https://example.com" autocomplete="off">
+      </div>
+
+      <div class="field">
+        <label for="filename">Filename:</label>
+        <input id="filename" name="filename" type="text" placeholder="file.txt" autocomplete="off">
+      </div>
+
+      <div class="field">
+        <label for="sql">SQL Input:</label>
+        <input id="sql" name="sql" type="text" placeholder="input SQL..." autocomplete="off">
+      </div>
+
+      <div class="field">
+        <label for="html">HTML Input:</label>
+        <input id="html" name="html" type="text" placeholder="&lt;script&gt;alert(1)&lt;/script&gt;" autocomplete="off">
+      </div>
+
+      <button type="submit">Xác thực ngay</button>
+    </form>
+
+    <section id="result-card" class="result-card" aria-live="polite">
+      <h2>Kết quả</h2>
+      <ul id="result-list" class="result-list"></ul>
+    </section>
+  </main>
+
+  <script>
+    const validators = ['email', 'url', 'filename', 'sql', 'html'];
+    const labels = {
+      email: 'Email',
+      url: 'URL',
+      filename: 'Filename',
+      sql: 'SQL Input',
+      html: 'HTML Input'
+    };
+
+    async function validateField(validator, value) {
+      const formData = new FormData();
+      formData.append('validator', validator);
+      formData.append('value', value);
+      const response = await fetch('/validate', { method: 'POST', body: formData });
+      return response.json();
+    }
+
+    function formatResult(name, result) {
+      if (typeof result === 'boolean') {
+        return result
+          ? '<span class="badge ok">Hợp lệ</span>'
+          : '<span class="badge bad">Không hợp lệ</span>';
+      }
+      return `<code>${String(result)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')}</code>`;
+    }
+
+    document.getElementById('validator-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const resultList = document.getElementById('result-list');
+      const resultCard = document.getElementById('result-card');
+      resultList.innerHTML = '<li class="result-item"><span>Đang xử lý</span><span>Vui lòng chờ...</span></li>';
+      resultCard.classList.add('visible');
+
+      const results = await Promise.all(validators.map(async (validator) => {
+        const value = form.elements[validator].value;
+        const payload = await validateField(validator, value);
+        return { validator, value, result: payload.result };
+      }));
+
+      resultList.innerHTML = results.map((item) => `
+        <li class="result-item">
+          <strong>${labels[item.validator]}</strong>
+          <span>${formatResult(item.validator, item.result)}</span>
+        </li>
+      `).join('');
+    });
+  </script>
+</body>
+</html>
