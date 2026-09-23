@@ -1,8 +1,10 @@
-# Lab2 - Bảo mật trước khi commit
+# Lab2 - Bảo mật trước khi commit (GitSecure)
 
 Thư mục này triển khai mục **1.4 THỰC HÀNH: BẢO MẬT TRƯỚC KHI COMMIT** trong `lab-01.pdf`.
 
-Mục tiêu của Lab2 là xây dựng hệ thống pre-commit hook **GitSecure** để tự động kiểm tra mã nguồn trước khi `git commit`, phát hiện rủi ro bảo mật và chặn commit nếu có vấn đề.
+Mục tiêu: xây dựng pre-commit hook **GitSecure** để tự động kiểm tra mã nguồn trước khi `git commit`, phát hiện rủi ro bảo mật và **chặn commit** nếu có vấn đề.
+
+Cách tổ chức giống giáo trình: toàn bộ logic nằm trong **một file duy nhất** `.githooks/pre-commit`, không tách module.
 
 ## Cấu trúc thư mục
 
@@ -13,35 +15,30 @@ Lab2/
 ├── examples/
 │   ├── safe_sample.py
 │   └── unsafe_sample.py.example
-├── gitsecure/
-│   ├── __init__.py
-│   └── scanner.py
 ├── tests/
 │   └── test_gitsecure.py
-├── gitsecure_cli.py
+├── .gitignore
 ├── LICENSE
 ├── README.md
 └── requirements.txt
 ```
 
-## Chức năng đã triển khai
+## Đối chiếu yêu cầu 1.4.1
 
-| Yêu cầu trong PDF | File xử lý | Trạng thái |
-|---|---|---|
-| Quét thông tin nhạy cảm như API key, password, token | `gitsecure/scanner.py` | Đã có |
-| Phát hiện thông tin định danh hardcode | `gitsecure/scanner.py` | Đã có |
-| Quét lỗ hổng cơ bản bằng Bandit | `gitsecure/scanner.py` | Đã có |
-| Kiểm tra quyền truy cập file | `gitsecure/scanner.py` | Đã có |
-| Kiểm tra tuân thủ giấy phép | `gitsecure/scanner.py` + `LICENSE` | Đã có |
-| Chặn commit khi phát hiện rủi ro | `.githooks/pre-commit` | Đã có |
-| Ghi log chi tiết findings | `gitsecure.log` | Đã có |
+| Yêu cầu trong PDF | Hàm trong `.githooks/pre-commit` |
+|---|---|
+| Quét API key, password, token hardcode | `scan_sensitive()` + `SENSITIVE_PATTERNS` |
+| Phát hiện thông tin định danh cài cứng | `scan_identity()` + `IDENTITY_PATTERNS` |
+| Quét lỗ hổng bằng Bandit | `scan_bandit()` |
+| Kiểm tra quyền truy cập file | `check_permissions()` |
+| Kiểm tra tuân thủ giấy phép | `check_license()` |
+| Chặn commit khi có rủi ro | `main()` trả về mã `1` |
+| Ghi log findings | `log()` → `gitsecure.log` |
 
 ## Cài đặt
 
-Mở terminal tại thư mục này:
-
 ```powershell
-cd "Buoi1\Lab2"
+cd "C:\Users\Admin\Documents\TH_LTANTT_2387701939\Buoi1\Lab2"
 python -m pip install -r requirements.txt
 ```
 
@@ -51,109 +48,90 @@ python -m pip install -r requirements.txt
 python -m unittest discover tests
 ```
 
-Kết quả mong đợi:
+Kết quả:
 
 ```text
-....
+.....
 ----------------------------------------------------------------------
-Ran 4 tests in ...s
+Ran 5 tests in 0.041s
 
 OK
 ```
 
-Ý nghĩa:
+Ý nghĩa: hook import được, hàm quét secret hoạt động, hàm quét định danh hoạt động, kiểm tra license đúng cả hai chiều (có file và thiếu file).
 
-- Scanner phát hiện được secret mẫu.
-- Scanner phát hiện được username hardcode.
-- Kiểm tra license pass khi có file `LICENSE`.
-- Luồng quét an toàn không báo lỗi khi không có rủi ro.
-
-## Chạy GitSecure thủ công
-
-Quét toàn bộ thư mục Lab2:
+## Chạy hook thủ công
 
 ```powershell
-python gitsecure_cli.py --all
+python .githooks\pre-commit
 ```
 
-Bỏ qua Bandit nếu chỉ muốn kiểm tra logic scanner nhanh:
-
-```powershell
-python gitsecure_cli.py --all --no-bandit
-```
-
-Nếu không phát hiện rủi ro, kết quả sẽ tương tự:
+Khi dữ liệu sạch:
 
 ```text
 GitSecure: Không phát hiện rủi ro bảo mật.
-Kết quả đã ghi vào: ...\gitsecure.log
+Kết quả đã ghi vào: ...\Lab2\gitsecure.log
 ```
 
-Nếu phát hiện rủi ro, chương trình trả exit code `1`, in danh sách findings và ghi vào `gitsecure.log`.
+Mã thoát là `0`, nghĩa là commit được phép đi tiếp.
 
-## Kiểm thử tình huống phát hiện lỗi
+## Kiểm thử trường hợp bị chặn
 
-File `examples/unsafe_sample.py.example` cố ý chứa API key/password/username mẫu để kiểm thử.
-
-Cách thử:
+Tạo file chứa dữ liệu rủi ro từ file mẫu:
 
 ```powershell
-Copy-Item examples\unsafe_sample.py.example examples\unsafe_sample.py
-python gitsecure_cli.py --all --no-bandit
-Remove-Item examples\unsafe_sample.py
+copy examples\unsafe_sample.py.example examples\unsafe_sample.py
+python .githooks\pre-commit
+del examples\unsafe_sample.py
 ```
 
-Kết quả mong đợi:
+Kết quả:
 
 ```text
 GitSecure chặn commit vì phát hiện rủi ro bảo mật:
-- [Sensitive Data] examples\unsafe_sample.py:2 Phát hiện API key có nguy cơ bị hardcode
-- [Sensitive Data] examples\unsafe_sample.py:3 Phát hiện Password có nguy cơ bị hardcode
-- [Hardcoded Identity] examples\unsafe_sample.py:4 Phát hiện thông tin định danh bị cài cứng
+- Sensitive info found in .\examples\unsafe_sample.py: pattern ...
+- Hardcoded identity found in .\examples\unsafe_sample.py: pattern ...
+- Bandit found security issues. Run: python -m bandit -r .
+Chi tiết đã ghi vào: ...\Lab2\gitsecure.log
 ```
 
-Ý nghĩa: hook nhận diện dữ liệu nhạy cảm/định danh hardcode và sẽ chặn commit để lập trình viên xử lý trước.
+Mã thoát là `1`, nghĩa là commit **bị chặn**.
 
-## Kích hoạt pre-commit hook
+## Kích hoạt hook cho Git
 
-Từ gốc repository, chạy:
+Chạy từ gốc repository:
 
 ```powershell
+cd "C:\Users\Admin\Documents\TH_LTANTT_2387701939"
 git config core.hooksPath "Buoi1/Lab2/.githooks"
 ```
 
-Sau đó khi chạy:
+Kiểm tra lại:
 
 ```powershell
-git commit
+git config core.hooksPath
 ```
 
-Git sẽ tự gọi `.githooks/pre-commit`. Nếu có findings, commit bị chặn.
+Từ đó mỗi lần `git commit`, GitSecure chạy tự động.
 
 ## File log
 
-Sau mỗi lần chạy, GitSecure ghi vào:
-
-```text
-gitsecure.log
-```
-
-Log gồm thời gian UTC, trạng thái `PASS` hoặc `FAIL`, loại kiểm tra và vị trí file/dòng nếu có.
+Mọi lần chạy đều ghi vào `gitsecure.log`, gồm thời gian, trạng thái `PASS`/`FAIL` và chi tiết từng phát hiện.
 
 ## Thống kê
 
 | Hạng mục | Số lượng |
 |---|---:|
-| Module scanner | 1 |
-| CLI chạy thủ công | 1 |
-| Pre-commit hook | 1 |
-| Unit test | 4 |
+| File thực thi hook | 1 |
 | Nhóm kiểm tra bảo mật | 5 |
-| File mẫu an toàn/rủi ro | 2 |
+| Unit test | 5 |
+| Danh sách file bỏ qua | 2 |
+| File mẫu | 2 |
 
-## Ghi chú
+## Ghi chú và giới hạn
 
-- Không commit `gitsecure.log` nếu log chứa thông tin nhạy cảm thật.
-- Regex trong lab chỉ phục vụ phát hiện cơ bản. Môi trường thật nên kết hợp thêm GitLeaks, TruffleHog hoặc detect-secrets.
-- Bandit chỉ phân tích mã Python; các ngôn ngữ khác cần công cụ SAST tương ứng.
-
+- Hook bỏ qua file `.example`, file log, thư mục `.git`, `__pycache__`, `.venv`, `venv`.
+- Trên Windows, `check_permissions()` dùng `icacls` để phát hiện quyền ghi cho `Everyone`. Trên Linux/macOS dùng `stat` để phát hiện bit world-writable và group-writable.
+- Regex nhận diện secret là mẫu cơ bản, phục vụ mục đích học tập. Môi trường thật nên dùng thêm GitLeaks, TruffleHog hoặc detect-secrets.
+- Bandit chỉ phân tích mã Python.
+- Không commit file `gitsecure.log` vì log có thể chứa thông tin nhạy cảm.

@@ -1,11 +1,138 @@
 #!/usr/bin/env python
-from pathlib import Path
-import sys
+import os, re, subprocess, sys, stat
+from datetime import datetime
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+os.chdir(ROOT)
 
-from gitsecure_cli import main
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
+LOG_FILE = "gitsecure.log"
+SENSITIVE_PATTERNS = [
+    r"apikey\s*=\s*['\"][A-Za-z0-9_\-]{16,}['\"]",
+    r"secret\s*=\s*['\"][A-Za-z0-9_\-]{8,}['\"]",
+    r"password\s*=\s*['\"][^'\"]{4,}['\"]",
+    r"token\s*=\s*['\"][A-Za-z0-9]{10,}['\"]",
+    r"(AKIA|ASIA)[A-Z0-9]{16}"
+]
+
+IDENTITY_PATTERNS = [
+    r"user\s*=\s*['\"][^'\"]{4,}['\"]",
+    r"username\s*=\s*['\"][^'\"]{4,}['\"]",
+    r"client_id\s*=\s*['\"][^'\"]{4,}['\"]",
+    r"tenant_id\s*=\s*['\"][^'\"]{4,}['\"]"
+]
+
+LICENSE_FILES = ["LICENSE", "LICENSE.md", "LICENSE.txt", "COPYING"]
+SKIP_DIRS = {".git", "__pycache__", ".venv", "venv", ".pytest_cache"}
+SKIP_EXTENSIONS = {".example", ".log", ".png", ".jpg", ".jpeg", ".gif", ".pdf", ".zip", ".7z", ".exe", ".dll"}
+
+def log(msg):
+    with open(LOG_FILE, "a", encoding="utf-8") as f:
+        f.write(f"[{datetime.now()}] {msg}\n")
+
+def scan_sensitive(file_path):
+    try:
+        with open(file_path, "r", errors="ignore") as f:
+            content = f.read()
+            for pattern in SENSITIVE_PATTERNS:
+                if re.search(pattern, content, re.IGNORECASE):
+                    return f"Sensitive info found in {file_path}: pattern {pattern}"
+    except Exception:
+        return None
+    return None
+
+def scan_identity(file_path):
+    try:
+        with open(file_path, "r", errors="ignore") as f:
+            content = f.read()
+            for pattern in IDENTITY_PATTERNS:
+                if re.search(pattern, content, re.IGNORECASE):
+                    return f"Hardcoded identity found in {file_path}: pattern {pattern}"
+    except Exception:
+        return None
+    return None
+
+def check_permissions(file_path):
+    if os.name == "nt":
+        return check_permissions_windows(file_path)
+    try:
+        mode = os.stat(file_path).st_mode
+    except Exception:
+        return None
+    if mode & (stat.S_IWOTH | stat.S_IWGRP):
+        return f"Weak file permission {oct(mode)} in {file_path}"
+    return None
+
+def check_permissions_windows(file_path):
+    try:
+        result = subprocess.run(["icacls", file_path], capture_output=True, text=True)
+    except Exception:
+        return None
+    for line in result.stdout.splitlines():
+        entry = line.strip().lower()
+        if "everyone" in entry and ("(f)" in entry or "(m)" in entry or "(w)" in entry):
+            return f"Weak file permission (Everyone has write access) in {file_path}"
+    return None
+
+def scan_bandit():
+    try:
+        result = subprocess.run([sys.executable, "-m", "bandit", "-q", "-r", "."], capture_output=True, text=True)
+    except Exception as error:
+        return f"Bandit could not run: {error}"
+    if result.returncode == 0:
+        return None
+    if "No module named bandit" in result.stderr:
+        return "Bandit is not installed. Run: pip install -r requirements.txt"
+    return "Bandit found security issues. Run: python -m bandit -r ."
+
+def check_license():
+    for name in LICENSE_FILES:
+        if os.path.exists(name):
+            return None
+    return "Missing license file: LICENSE / LICENSE.md / LICENSE.txt / COPYING"
+
+def iter_files():
+    for folder, dirs, files in os.walk("."):
+        dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
+        for name in files:
+            if name == LOG_FILE:
+                continue
+            if os.path.splitext(name)[1].lower() in SKIP_EXTENSIONS:
+                continue
+            yield os.path.join(folder, name)
+
+def main():
+    findings = []
+    for path in iter_files():
+        for scanner in (scan_sensitive, scan_identity, check_permissions):
+            found = scanner(path)
+            if found:
+                findings.append(found)
+
+    bandit_result = scan_bandit()
+    if bandit_result:
+        findings.append(bandit_result)
+
+    license_result = check_license()
+    if license_result:
+        findings.append(license_result)
+
+    if findings:
+        log("FAIL commit blocked")
+        for item in findings:
+            log(item)
+        print("GitSecure chặn commit vì phát hiện rủi ro bảo mật:")
+        for item in findings:
+            print(f"- {item}")
+        print(f"Chi tiết đã ghi vào: {os.path.join(ROOT, LOG_FILE)}")
+        return 1
+
+    log("PASS no security issues found")
+    print("GitSecure: Không phát hiện rủi ro bảo mật.")
+    print(f"Kết quả đã ghi vào: {os.path.join(ROOT, LOG_FILE)}")
+    return 0
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    sys.exit(main())
