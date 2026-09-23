@@ -1,0 +1,285 @@
+================================================================================
+MÔ TẢ CHỨC NĂNG - CÁCH DÙNG - CÁCH KIỂM THỬ - Ý NGHĨA KẾT QUẢ
+BUỔI 1 - LAB 3: GHI NHẬT KÝ ƯU TIÊN BẢO MẬT (SecureLogger)
+================================================================================
+
+Đường dẫn: C:\Users\Admin\Documents\TH_LTANTT_2387701939\Buoi1\Lab 3
+Tài liệu gốc: lab-01.pdf - mục 1.6 THỰC HÀNH: GHI NHẬT KÝ ƯU TIÊN BẢO MẬT
+
+
+--------------------------------------------------------------------------------
+1. MỤC TIÊU CỦA LAB
+--------------------------------------------------------------------------------
+Xây dựng hệ thống ghi nhật ký (SecureLogger) có khả năng:
+  - Hỗ trợ đa cấp độ log: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  - Tự động phát hiện và che thông tin định danh cá nhân (PII)
+  - Quản lý luân phiên log (log rotation) kèm nén dữ liệu
+  - Phát hiện thay đổi trái phép trên tập tin nhật ký (tamper detection)
+  - Ghi nhật ký theo cấu trúc JSON
+  - Tích hợp với thư viện SecureValidator (Lab 1) để ghi lại tất cả
+    các lần kiểm tra validation
+
+
+--------------------------------------------------------------------------------
+2. CẤU TRÚC THƯ MỤC
+--------------------------------------------------------------------------------
+Lab 3/
+  app.py                        : API Flask demo (4 endpoint)
+  requirements.txt              : Thư viện cần cài (Flask, bleach)
+  README.md                     : Tài liệu hướng dẫn đầy đủ
+  MO_TA_CHUC_NANG_LAB3.txt      : File mô tả này
+  securelogger/
+    __init__.py                 : Xuất lớp SecureLogger
+    logger.py                   : Toàn bộ logic ghi log bảo mật
+  securevalidator/
+    __init__.py
+    core.py                     : Thư viện xác thực đầu vào (copy từ Lab 1)
+  tests/
+    test_securelogger.py        : 3 unit test
+  secure.log                    : File log được sinh ra khi chạy (JSON)
+  secure.log.sig                : Chữ ký SHA-256 để kiểm tra toàn vẹn log
+
+
+--------------------------------------------------------------------------------
+3. CHỨC NĂNG CHI TIẾT TRONG CODE
+--------------------------------------------------------------------------------
+3.1. Ghi log đa cấp độ (securelogger/logger.py)
+     - Hàm log(level, message, **context): ghi log theo cấp độ bất kỳ
+     - Các hàm tiện lợi: debug(), info(), warning(), error(), critical()
+     - Cấp độ không hợp lệ sẽ mặc định là INFO
+
+3.2. Che PII tự động (hàm mask_pii)
+     Dữ liệu được che trước khi ghi vào file:
+       - Email         : nguyen@example.com   ->  ***@***
+       - Số điện thoại : 0912345678           ->  ***PHONE***
+       - CCCD 12 số    : 012345678901         ->  ***ID***
+       - Số thẻ        : 4111 1111 1111 1111  ->  ***CARD***
+       - Token/secret  : api_key=abc123       ->  api_key=***SECRET***
+     Hàm này xử lý được cả chuỗi, dict và list (duyệt đệ quy).
+     Ngoài ra còn escape ký tự xuống dòng (\n), \r, \t để chống Log Injection.
+
+3.3. Ghi log dạng JSON (lớp JsonFormatter)
+     Mỗi dòng log là một JSON object gồm:
+       - timestamp : thời điểm ghi log (UTC, ISO 8601)
+       - level     : cấp độ log
+       - logger    : tên logger
+       - message   : nội dung đã che PII
+       - context   : dữ liệu bổ sung đã che PII
+
+3.4. Log rotation kèm nén dữ liệu
+     - Dùng RotatingFileHandler: khi file vượt max_bytes (mặc định 1.000.000 byte)
+       thì tự động xoay vòng, giữ tối đa backup_count file cũ (mặc định 3)
+     - Hàm _compress_rotated_log(): file log cũ được nén thành .gz bằng gzip
+       và file gốc bị xóa, giúp tiết kiệm dung lượng lưu trữ
+
+3.5. Phát hiện sửa log trái phép (tamper detection)
+     - calculate_digest(): tính SHA-256 trên toàn bộ nội dung secure.log
+     - update_signature(): ghi hash vào secure.log.sig sau mỗi lần ghi log
+     - verify_integrity(): so sánh hash hiện tại với hash trong .sig
+       -> True  : log nguyên vẹn
+       -> False : log đã bị thay đổi hoặc thiếu file .sig
+
+3.6. Tích hợp SecureValidator (app.py)
+     Mỗi lần gọi POST /validate đều được ghi lại qua hàm log_validation()
+     với message "validation_executed", gồm: validator, input, result.
+     Input được che PII trước khi ghi log.
+
+
+--------------------------------------------------------------------------------
+4. CÁC ENDPOINT CỦA API
+--------------------------------------------------------------------------------
+  GET  /                 : Xem mô tả API (danh sách endpoint)
+  POST /validate         : Kiểm tra dữ liệu bằng SecureValidator + ghi log
+  POST /log              : Ghi một log bất kỳ để thử che PII
+  GET  /logs/integrity   : Kiểm tra log có bị thay đổi không
+
+
+--------------------------------------------------------------------------------
+5. CÁCH CÀI ĐẶT VÀ CHẠY
+--------------------------------------------------------------------------------
+Bước 1 - Di chuyển vào thư mục Lab 3:
+    cd "C:\Users\Admin\Documents\TH_LTANTT_2387701939\Buoi1\Lab 3"
+
+Bước 2 - Cài thư viện:
+    pip install -r requirements.txt
+
+Bước 3 - Chạy chương trình (port mặc định 5000):
+    python app.py
+
+    Nếu muốn đổi port (ví dụ 5001):
+    python -c "from app import app; app.run(debug=True, port=5001)"
+
+Bước 4 - Mở trình duyệt:
+    http://127.0.0.1:5000/       (hoặc http://127.0.0.1:5001/)
+    Trang này trả về JSON mô tả API, KHÔNG phải giao diện nhập liệu.
+    Lab 3 là bài về API/log nên phải gửi request POST bằng Postman
+    hoặc PowerShell.
+
+Dừng server: bấm Ctrl + C tại terminal đang chạy.
+
+
+--------------------------------------------------------------------------------
+6. CÁCH KIỂM THỬ
+--------------------------------------------------------------------------------
+6.1. Kiểm thử tự động (unit test) - không cần chạy server
+     Lệnh:
+       python -m unittest discover tests
+     Kết quả mong đợi:
+       ...
+       ----------------------------------------------------------------------
+       Ran 3 tests in ...s
+       OK
+
+     Ý nghĩa từng test:
+       - test_masks_pii_in_json_log  : log đúng định dạng JSON và email,
+         số điện thoại, CCCD đều bị che
+       - test_detects_tampering      : phát hiện được khi file log bị sửa
+       - test_logs_validator_result  : SecureValidator được tích hợp,
+         kết quả validation được ghi vào log
+
+6.2. Kiểm thử bằng Postman
+     Request 1 - Kiểm tra email hợp lệ:
+       Method : POST
+       URL    : http://127.0.0.1:5001/validate
+       Body   : raw -> JSON
+       Nội dung:
+         {
+           "validator": "email",
+           "value": "student@example.edu.vn"
+         }
+       Kết quả nhận được (HTTP 200):
+         {
+           "input": "student@example.edu.vn",
+           "result": true,
+           "validator": "email"
+         }
+
+     Request 2 - Ghi log có chứa PII:
+       Method : POST
+       URL    : http://127.0.0.1:5001/log
+       Body   : raw -> JSON
+       Nội dung:
+         {
+           "level": "INFO",
+           "message": "User nguyen@example.com phone 0912345678",
+           "context": {"cccd": "012345678901"}
+         }
+       Kết quả nhận được (HTTP 200):
+         {"logged": true, "level": "INFO"}
+
+     Request 3 - Kiểm tra toàn vẹn log:
+       Method : GET
+       URL    : http://127.0.0.1:5001/logs/integrity
+       Kết quả nhận được:
+         {"integrity_ok": true}
+
+6.3. Kiểm thử bằng PowerShell (thay cho Postman)
+     Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:5001/validate" `
+       -ContentType "application/json" `
+       -Body '{"validator":"email","value":"student@example.edu.vn"}'
+
+     Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:5001/log" `
+       -ContentType "application/json" `
+       -Body '{"level":"INFO","message":"User nguyen@example.com phone 0912345678","context":{"cccd":"012345678901"}}'
+
+     Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:5001/logs/integrity"
+
+6.4. Kiểm thử tamper detection (thử phá log)
+     - Mở secure.log, thêm một ký tự bất kỳ rồi lưu lại
+     - Gọi lại GET /logs/integrity
+       -> Kết quả: {"integrity_ok": false}
+     - Sau đó gửi thêm 1 request bất kỳ để hệ thống cập nhật lại chữ ký
+
+
+--------------------------------------------------------------------------------
+7. KẾT QUẢ THỰC TẾ ĐÃ GHI NHẬN
+--------------------------------------------------------------------------------
+7.1. Trường hợp gửi đúng (email hợp lệ)
+     Response: result = true
+     Dòng log mới trong secure.log:
+
+     {"context": {"input": "***@***", "result": true, "validator": "email"},
+      "level": "INFO", "logger": "securelogger.secure.log",
+      "message": "validation_executed",
+      "timestamp": "2026-09-23T09:06:13.071394+00:00"}
+
+7.2. Trường hợp gửi sai (thiếu body JSON)
+     Response: HTTP 400 - "validator không hợp lệ"
+     Dòng log:
+
+     {"context": {"input": "", "validator": null}, "level": "WARNING",
+      "logger": "securelogger.secure.log",
+      "message": "invalid_validator_requested", "timestamp": "..."}
+
+7.3. File chữ ký secure.log.sig
+     Ví dụ giá trị hash SHA-256:
+     40a47b31af80fcec278533cfc9a103760977fb844e386928edd8e669b2f89f95
+
+7.4. Kết quả unit test
+     Ran 3 tests - OK
+
+
+--------------------------------------------------------------------------------
+8. Ý NGHĨA CỦA KẾT QUẢ
+--------------------------------------------------------------------------------
+8.1. Response "result": true / false
+     - true  : dữ liệu đầu vào hợp lệ, không chứa mẫu nguy hiểm
+     - false : dữ liệu bị từ chối (ví dụ email chứa lệnh SQL, URL trỏ về
+       localhost gây nguy cơ SSRF, tên file chứa ../ gây path traversal)
+
+8.2. Log có PII bị che (***@***, ***PHONE***, ***ID***, ***CARD***)
+     Đây là ý nghĩa bảo mật cốt lõi của Lab 3: hệ thống vẫn ghi nhật ký
+     đầy đủ để debug/giám sát, nhưng KHÔNG làm rò rỉ dữ liệu cá nhân
+     trong file log. Nếu file log bị lộ, thông tin người dùng vẫn được
+     bảo vệ. Điều này đúng với nguyên tắc trong giáo trình:
+     "Tuyệt đối không ghi thô dữ liệu nhạy cảm vào log".
+
+8.3. Log dạng JSON
+     Máy đọc được, dễ dàng đưa vào các hệ thống phân tích log
+     (ELK, Splunk, Grafana Loki...) để tìm kiếm, thống kê, cảnh báo.
+     Cấu trúc cố định giúp chống Log Injection.
+
+8.4. File secure.log.sig
+     Chứng minh nội dung log không bị chỉnh sửa. Nếu kẻ tấn công sửa
+     hoặc xóa bớt dòng log, hash sẽ không khớp -> verify_integrity()
+     trả về false. Đây là cơ chế phát hiện thay đổi trái phép mà
+     giáo trình yêu cầu.
+
+8.5. Cấp độ log (level)
+     - DEBUG    : thông tin chi tiết phục vụ gỡ lỗi
+     - INFO     : hoạt động bình thường (ví dụ validation_executed)
+     - WARNING  : có dấu hiệu bất thường nhưng chưa gây lỗi
+                  (ví dụ request sai định dạng)
+     - ERROR    : lỗi xảy ra trong quá trình xử lý
+     - CRITICAL : sự cố nghiêm trọng, cần xử lý ngay
+     Nhờ phân cấp đúng, người vận hành lọc được log theo mức độ
+     quan trọng để phản ứng kịp thời.
+
+8.6. Log rotation và nén .gz
+     File log không phình to vô hạn. Khi vượt ngưỡng, log cũ được nén
+     lại và giữ theo số lượng giới hạn, giúp tiết kiệm dung lượng và
+     vẫn tra cứu được lịch sử khi cần.
+
+8.7. Ý nghĩa tổng thể
+     Lab 3 giải quyết đồng thời 2 nhu cầu trái ngược nhau:
+       - Cần ghi log chi tiết để giám sát, truy vết sự cố bảo mật
+       - Không được để lộ dữ liệu nhạy cảm và không được để log bị sửa
+     Kết quả: hệ thống vừa hữu ích cho vận hành, vừa an toàn về bảo mật.
+
+
+--------------------------------------------------------------------------------
+9. HẠN CHẾ CẦN LƯU Ý
+--------------------------------------------------------------------------------
+  - File secure.log và secure.log.sig KHÔNG nên commit lên Git.
+  - Che PII chỉ là lớp bảo vệ ở tầng ứng dụng; file log vẫn cần được
+    phân quyền truy cập chặt trên máy chủ.
+  - Chữ ký SHA-256 giúp phát hiện sửa đổi, nhưng nếu kẻ tấn công có
+    quyền ghi cả 2 file thì có thể cập nhật lại cả chữ ký. Môi trường
+    thực tế nên lưu chữ ký ở nơi riêng có phân quyền cao hơn.
+  - Regex CCCD hiện tại chỉ nhận chuỗi đúng 12 chữ số. CMND 9 số cũ
+    sẽ không bị che, cần mở rộng nếu yêu cầu bao gồm.
+
+
+================================================================================
+Hết.
+================================================================================

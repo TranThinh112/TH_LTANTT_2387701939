@@ -1,4 +1,4 @@
-# TH_LTANTT_2387701939
+﻿# TH_LTANTT_2387701939
 
 Repository thực hành môn **Lập trình An ninh thông tin**.
 
@@ -40,6 +40,26 @@ Mục tiêu là xây dựng thư viện Python `SecureValidator` để kiểm tr
 - Path Traversal qua tên file.
 - SQL Injection qua chuỗi đầu vào.
 - XSS qua HTML input.
+
+## Demo trực tuyến (Render)
+
+- Đường dẫn chạy thật: https://securevalidator-e79j.onrender.com
+- Giao diện gồm 5 ô nhập: `Email`, `URL`, `Filename`, `SQL Input`, `HTML Input`.
+- Bấm **Xác thực ngay** để xem kết quả kiểm tra / làm sạch dữ liệu.
+
+Cấu hình deploy trên Render:
+
+| Field | Value |
+|---|---|
+| Name | `securevalidator` |
+| Runtime | `Python 3` |
+| Branch | `main` |
+| Root Directory | `Buoi1/Lab 1` |
+| Build Command | `pip install -r requirements.txt` |
+| Start Command | `gunicorn app:app` |
+| Instance Type | `Free` |
+
+> Lưu ý: Render gói Free sẽ tự "ngủ" sau khoảng 15 phút không có truy cập. Lần mở lại đầu tiên có thể chậm khoảng 30-60 giây, đây là hiện tượng bình thường, không phải lỗi ứng dụng.
 
 ## Chức năng chính của SecureValidator
 

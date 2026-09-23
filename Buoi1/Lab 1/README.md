@@ -1,8 +1,28 @@
-# Lab 1 - Thư viện xác thực đầu vào SecureValidator
+﻿# Lab 1 - Thư viện xác thực đầu vào SecureValidator
 
 Bài này triển khai mục **1.2 THỰC HÀNH: THƯ VIỆN XÁC THỰC ĐẦU VÀO** trong file `lab-01.pdf`.
 
 Mục tiêu: xây dựng thư viện Python `SecureValidator` để kiểm tra và làm sạch dữ liệu đầu vào, giúp giảm rủi ro từ các lỗi bảo mật phổ biến như Injection, SSRF, Path Traversal và XSS.
+
+## Demo trực tuyến (Render)
+
+- Đường dẫn chạy thật: https://securevalidator-e79j.onrender.com
+- Giao diện gồm 5 ô nhập: `Email`, `URL`, `Filename`, `SQL Input`, `HTML Input`.
+- Bấm **Xác thực ngay** để xem kết quả kiểm tra / làm sạch dữ liệu.
+
+Cấu hình deploy trên Render:
+
+| Field | Value |
+|---|---|
+| Name | `securevalidator` |
+| Runtime | `Python 3` |
+| Branch | `main` |
+| Root Directory | `Buoi1/Lab 1` |
+| Build Command | `pip install -r requirements.txt` |
+| Start Command | `gunicorn app:app` |
+| Instance Type | `Free` |
+
+> Lưu ý: Render gói Free sẽ tự "ngủ" sau khoảng 15 phút không có truy cập. Lần mở lại đầu tiên có thể chậm khoảng 30-60 giây, đây là hiện tượng bình thường, không phải lỗi ứng dụng.
 
 ## Cấu trúc thư mục
 

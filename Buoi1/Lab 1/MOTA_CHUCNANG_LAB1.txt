@@ -1,0 +1,287 @@
+================================================================================
+  BÀI 1 - LAB 1: THƯ VIỆN XÁC THỰC ĐẦU VÀO "SecureValidator"
+  Mô tả chức năng - Cách dùng - Cách kiểm thử - Ý nghĩa kết quả
+================================================================================
+
+I. GIỚI THIỆU
+--------------------------------------------------------------------------------
+Bài thực hành tương ứng mục 1.2 trong file lab-01.pdf:
+"THỰC HÀNH: THƯ VIỆN XÁC THỰC ĐẦU VÀO".
+
+Mục tiêu: xây dựng thư viện Python tên SecureValidator, có nhiệm vụ kiểm tra
+(validate) và làm sạch (sanitize) dữ liệu đầu vào, nhằm giảm rủi ro các lỗ hổng
+bảo mật phổ biến:
+  - Injection qua email / dữ liệu chuỗi
+  - SSRF (Server-Side Request Forgery) qua URL
+  - Path Traversal qua tên tệp
+  - SQL Injection qua chuỗi đầu vào
+  - XSS (Cross-Site Scripting) qua HTML
+
+Ngoài thư viện, bài còn có giao diện web Flask để nhập dữ liệu và xem kết quả
+trực quan, cùng bộ unit test cho cả dữ liệu hợp lệ lẫn dữ liệu độc hại.
+
+
+II. CẤU TRÚC THƯ MỤC
+--------------------------------------------------------------------------------
+Buoi1/Lab 1/
+├── app.py                        Ứng dụng Flask (giao diện web)
+├── requirements.txt              Thư viện cần cài
+├── render.yaml                   Cấu hình deploy Render
+├── MOTA_CHUCNANG_KIEMTHU.txt     File mô tả này
+├── securevalidator/
+│   ├── __init__.py               Xuất các hàm ra ngoài package
+│   └── core.py                   Toàn bộ logic kiểm tra / làm sạch
+├── templates/
+│   └── index.html                Giao diện nhập 5 trường và hiện kết quả
+└── tests/
+    └── test_validators.py        Bộ unit test
+
+
+III. CHỨC NĂNG CHI TIẾT CỦA THƯ VIỆN
+--------------------------------------------------------------------------------
+Thư viện cung cấp 5 hàm chính.
+
+1. validate_email(email) -> True / False
+   Chức năng: kiểm tra một chuỗi có phải email hợp lệ hay không.
+   Quy tắc áp dụng:
+     - Phải là chuỗi (str), không rỗng, dài không quá 254 ký tự.
+     - Loại bỏ khoảng trắng ở hai đầu trước khi kiểm tra.
+     - Không chứa ký tự điều khiển (xuống dòng, tab, ký tự ASCII < 32).
+     - Không chứa mẫu injection nguy hiểm như: ; -- /* */ SELECT INSERT UPDATE
+       DELETE DROP UNION EXEC SCRIPT ONERROR ONLOAD
+     - Phải khớp định dạng: ten@ten-mien.tld
+     - Phần tên (trước @) tối đa 64 ký tự.
+     - Mỗi nhãn của tên miền dài 1-63 ký tự, không bắt đầu/kết thúc bằng dấu gạch ngang.
+   Ý nghĩa bảo mật: chặn dữ liệu đầu vào chứa câu lệnh hoặc ký tự có thể bị lợi
+   dụng để chèn mã khi email được đưa vào truy vấn, log hoặc header.
+
+2. validate_url(url) -> True / False
+   Chức năng: kiểm tra URL hợp lệ và phòng chống SSRF.
+   Quy tắc áp dụng:
+     - Phải là chuỗi, không rỗng, dài không quá 2048 ký tự.
+     - Chỉ chấp nhận giao thức http hoặc https (loại bỏ file://, ftp://, javascript:...).
+     - Phải có host (netloc).
+     - Không cho phép URL chứa sẵn tài khoản/mật khẩu: http://user:pass@host
+     - Host phải là host công khai (public):
+         + Chặn "localhost" và "localhost.localdomain".
+         + Chặn địa chỉ IP loopback (127.0.0.0/8), IP private (10.x, 172.16-31.x,
+           192.168.x), IP link-local (169.254.x - dải metadata của cloud),
+           multicast, reserved, unspecified.
+     - Cổng (port) nếu có chỉ cho phép: 80, 443, 8080, 8443.
+   Ý nghĩa bảo mật: ngăn kẻ tấn công lợi dụng server để gọi vào hệ thống nội bộ
+   hoặc dịch vụ metadata của máy chủ cloud (kỹ thuật tấn công SSRF).
+
+3. validate_filename(filename) -> True / False
+   Chức năng: kiểm tra tên tệp an toàn, chặn path traversal.
+   Quy tắc áp dụng:
+     - Phải là chuỗi, không rỗng, dài không quá 255 ký tự.
+     - Giải mã ký tự URL (ví dụ ..%2f -> ../) trước khi kiểm tra.
+     - Loại bỏ ký tự điều khiển.
+     - Chuẩn hóa đường dẫn và từ chối nếu:
+         + Bắt đầu bằng ../, .. hoặc /
+         + Còn chứa dấu / hoặc \ (tức là có đường dẫn thư mục)
+     - Chỉ cho phép các ký tự: chữ, số, dấu chấm, gạch dưới, gạch ngang, khoảng trắng.
+   Ý nghĩa bảo mật: ngăn kẻ tấn công ghi/đọc tệp ngoài thư mục cho phép, ví dụ
+   ghi đè tệp cấu hình hoặc đọc tệp chứa mật khẩu.
+
+4. sanitize_sql_input(input_str) -> chuỗi đã làm sạch
+   Chức năng: làm sạch chuỗi đầu vào để giảm rủi ro SQL Injection.
+   Xử lý áp dụng:
+     - Loại bỏ ký tự null (\x00).
+     - Loại bỏ các token nguy hiểm: -- # /* */ ; và các từ khóa
+       DROP TRUNCATE ALTER EXEC EXECUTE UNION SLEEP BENCHMARK
+     - Nhân đôi dấu nháy đơn và nháy kép (escape).
+     - Cắt khoảng trắng thừa hai đầu.
+   Ý nghĩa bảo mật: giảm khả năng chèn câu lệnh SQL qua dữ liệu người dùng.
+
+5. sanitize_html_input(html_str) -> chuỗi HTML đã làm sạch
+   Chức năng: làm sạch HTML để ngăn chặn XSS.
+   Cơ chế:
+     - Ưu tiên dùng thư viện bleach (whitelist) nếu đã cài.
+       Chỉ cho phép các thẻ: b, strong, i, em, u, p, br, ul, ol, li, a, code, pre.
+       Chỉ cho phép thuộc tính href, title, rel trên thẻ a.
+       Chỉ cho phép giao thức http, https, mailto.
+     - Nếu chưa cài bleach, dùng chế độ dự phòng: xóa toàn bộ khối <script>,
+       <style> và mọi thẻ HTML, sau đó escape ký tự đặc biệt.
+   Ý nghĩa bảo mật: ngăn mã JavaScript độc hại chạy trên trình duyệt người dùng
+   khi nội dung do người dùng nhập được hiển thị lại.
+
+
+IV. ỨNG DỤNG WEB (app.py + templates/index.html)
+--------------------------------------------------------------------------------
+Giao diện gồm 5 ô nhập: Email, URL, Filename, SQL Input, HTML Input.
+Bấm nút "Xác thực ngay" để kiểm tra cả 5 trường cùng lúc.
+
+Các tuyến (route) của Flask:
+  GET  /                 Trả về giao diện HTML
+  POST /validate         Nhận JSON hoặc form với 2 trường:
+                            validator: email | url | filename | sql | html
+                            value:     dữ liệu cần kiểm tra
+                         Trả về JSON: {"validator":..., "input":..., "result":...}
+                         Nếu validator không hợp lệ, trả về mã lỗi 400.
+
+
+V. CÁCH DÙNG
+--------------------------------------------------------------------------------
+1. Cài đặt môi trường
+   Mở terminal tại thư mục Buoi1/Lab 1, chạy:
+
+       pip install -r requirements.txt
+
+   (Hoặc dùng môi trường ảo:
+       python -m venv .venv
+       .\.venv\Scripts\Activate.ps1
+       pip install -r requirements.txt )
+
+2. Dùng như thư viện trong code Python
+
+       from securevalidator import (
+           validate_email, validate_url, validate_filename,
+           sanitize_sql_input, sanitize_html_input,
+       )
+
+       validate_email("student@example.edu.vn")   # True
+       validate_url("http://127.0.0.1/admin")     # False
+       sanitize_sql_input("' OR 1=1; DROP TABLE users --")
+
+3. Chạy giao diện web
+
+       python app.py
+
+   Sau đó mở trình duyệt tại:  http://127.0.0.1:5000/
+   Nhập dữ liệu vào 5 ô và bấm "Xác thực ngay".
+
+4. Chạy bộ kiểm thử tự động
+
+       python -m unittest discover tests
+
+
+VI. CÁCH KIỂM THỬ
+--------------------------------------------------------------------------------
+A. KIỂM THỬ TỰ ĐỘNG (unit test)
+   Lệnh:  python -m unittest discover tests
+   Bộ test hiện có 8 test case, phủ cả dữ liệu hợp lệ và dữ liệu độc hại:
+     1. Email hợp lệ
+     2. Email chứa injection
+     3. URL public hợp lệ
+     4. URL nguy hiểm (SSRF, localhost, metadata cloud, file://)
+     5. Filename hợp lệ
+     6. Filename path traversal
+     7. SQL input chứa lệnh nguy hiểm
+     8. HTML input chứa thẻ script và thuộc tính onerror
+
+   Kết quả đã chạy thực tế:
+
+       ........
+       ----------------------------------------------------------------------
+       Ran 8 tests in 0.016s
+
+       OK
+
+   Cách đọc kết quả:
+     - Mỗi dấu chấm (.) tương ứng một test case chạy thành công.
+     - Chữ F là test thất bại (fail).
+     - Dòng "OK" nghĩa là toàn bộ test đều đạt.
+
+B. KIỂM THỬ THỦ CÔNG TRÊN GIAO DIỆN WEB
+   Nhập lần lượt các giá trị sau vào 5 ô rồi bấm "Xác thực ngay":
+
+     Email        : student@example.edu.vn
+     URL          : https://example.com
+     Filename     : file.txt
+     SQL Input    : ' OR 1=1; DROP TABLE users --
+     HTML Input   : <script>alert(1)</script><b>OK</b>
+
+   Sau đó thử lại với dữ liệu độc hại:
+
+     Email        : admin@example.com; DROP TABLE users
+     URL          : http://127.0.0.1/admin
+     Filename     : ../secret.txt
+
+C. KIỂM THỬ QUA API (Postman hoặc curl)
+   POST http://127.0.0.1:5000/validate
+   Header: Content-Type: application/json
+   Body:   {"validator": "email", "value": "student@example.edu.vn"}
+
+
+VII. KẾT QUẢ THỰC TẾ VÀ Ý NGHĨA
+--------------------------------------------------------------------------------
+Bảng dưới đây là kết quả chạy thật của thư viện:
+
+  STT | Hàm                     | Dữ liệu đầu vào                        | Kết quả
+  ----+-------------------------+-----------------------------------------+-------------------------
+   1  | validate_email          | student@example.edu.vn                  | True
+   2  | validate_email          | admin@example.com; DROP TABLE users     | False
+   3  | validate_email          | attacker@example.com + xuống dòng Bcc   | False
+   4  | validate_url            | https://example.com                     | True
+   5  | validate_url            | http://127.0.0.1/admin                  | False
+   6  | validate_url            | http://localhost:5000                   | False
+   7  | validate_url            | http://169.254.169.254/latest/meta-data | False
+   8  | validate_url            | file:///etc/passwd                      | False
+   9  | validate_filename       | file.txt                                | True
+  10  | validate_filename       | ../secret.txt                           | False
+  11  | validate_filename       | ..%2fsecret.txt                         | False
+  12  | validate_filename       | folder/secret.txt                       | False
+  13  | sanitize_sql_input      | ' OR 1=1; DROP TABLE users --           | '' OR 1=1  TABLE users
+  14  | sanitize_html_input     | <script>alert(1)</script><b>OK</b>      | alert(1)<b>OK</b>
+  15  | sanitize_html_input     | ...<img src=x onerror=alert(1)>         | đã xóa thẻ img và onerror
+
+
+Ý NGHĨA CỦA TỪNG LOẠI KẾT QUẢ:
+
+  - True (Hợp lệ)
+    Dữ liệu đúng định dạng và không chứa dấu hiệu tấn công. Có thể cho phép
+    đi tiếp vào hệ thống.
+
+  - False (Không hợp lệ)
+    Dữ liệu sai định dạng hoặc mang dấu hiệu tấn công. Hệ thống phải từ chối
+    và không được đưa dữ liệu này vào xử lý tiếp.
+
+  - Chuỗi đã làm sạch (SQL)
+    Kết quả '"'' OR 1=1  TABLE users"' cho thấy các thành phần nguy hiểm
+    (DROP, dấu ;, dấu --) đã bị loại bỏ, dấu nháy đơn đã được escape.
+    Điều này làm giảm khả năng chèn câu lệnh SQL, nhưng KHÔNG thay thế hoàn
+    toàn truy vấn tham số hóa.
+
+  - Chuỗi đã làm sạch (HTML)
+    Kết quả 'alert(1)<b>OK</b>' cho thấy:
+      + Thẻ <script> đã bị loại bỏ, nên mã JavaScript không còn thực thi được.
+      + Thuộc tính onerror và thẻ <img> đã bị xóa.
+      + Thẻ <b> được giữ lại vì nằm trong danh sách an toàn.
+      + Phần chữ "alert(1)" còn lại chỉ là văn bản thuần, trình duyệt không
+        chạy nó như mã, nên không gây nguy hiểm.
+
+  - Kết quả trên giao diện web
+      Hợp lệ          -> chữ màu xanh
+      Không hợp lệ    -> chữ màu đỏ
+      Chuỗi làm sạch  -> hiển thị nội dung sau khi xử lý
+
+  Kết luận chung: các kết quả trên chứng minh thư viện phân biệt được dữ liệu
+  hợp lệ và dữ liệu tấn công, đồng thời làm sạch được dữ liệu nguy hiểm trước
+  khi sử dụng.
+
+
+VIII. GHI CHÚ VÀ HẠN CHẾ
+--------------------------------------------------------------------------------
+1. sanitize_sql_input() chỉ là lớp bảo vệ bổ sung. Khi làm việc với cơ sở dữ
+   liệu thật, bắt buộc dùng truy vấn tham số hóa (prepared statement /
+   parameterized query). Không bao giờ nối chuỗi để tạo câu SQL.
+
+2. validate_url() mới kiểm tra ở mức chuỗi và IP trực tiếp. Kẻ tấn công có thể
+   dùng tên miền phân giải về IP nội bộ (DNS rebinding). Ở môi trường thật cần
+   kiểm tra thêm DNS resolution, chặn redirect và cấu hình firewall/egress rule.
+
+3. sanitize_html_input() nên dùng thư viện bleach ở môi trường thật để xử lý
+   HTML đầy đủ và chính xác hơn chế độ dự phòng.
+
+4. validate_filename() chỉ kiểm tra tên tệp, không kiểm tra quyền ghi thực tế
+   trên hệ thống tệp. Cần kết hợp kiểm tra quyền và giới hạn thư mục lưu tệp.
+
+5. Khi deploy lên Render (theo hướng dẫn trong PDF), cấu hình cần dùng:
+     Root Directory : Buoi1/Lab 1
+     Build Command  : pip install -r requirements.txt
+     Start Command  : gunicorn app:app
+   Lưu ý Render Free sẽ "ngủ" sau khoảng 15 phút không truy cập; lần mở lại đầu
+   tiên có thể chậm 30-60 giây, đây là hiện tượng bình thường.
+
+================================================================================

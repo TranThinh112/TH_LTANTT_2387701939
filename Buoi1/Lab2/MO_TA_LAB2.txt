@@ -1,0 +1,191 @@
+﻿================================================================================
+LAB2 - GITSECURE: BẢO MẬT TRƯỚC KHI COMMIT
+Mục 1.4 - Thực hành Lập trình An ninh thông tin
+Đường dẫn: Buoi1\Lab2
+================================================================================
+
+--------------------------------------------------------------------------------
+1. MỤC TIÊU
+--------------------------------------------------------------------------------
+Xây dựng pre-commit hook "GitSecure" tự động kiểm tra mã nguồn mỗi khi chạy
+git commit. Nếu phát hiện rủi ro bảo mật, hook CHẶN commit và ghi chi tiết
+vào file log để xem xét sau.
+
+Toàn bộ logic nằm trong một file duy nhất: .githooks/pre-commit
+
+--------------------------------------------------------------------------------
+2. CHỨC NĂNG
+--------------------------------------------------------------------------------
+2.1. Quét thông tin nhạy cảm - hàm scan_sensitive()
+     Dò các mẫu API key, secret, mật khẩu, token bị viết cứng trong mã nguồn.
+     Danh sách mẫu nằm trong hằng SENSITIVE_PATTERNS.
+
+2.2. Phát hiện thông tin định danh cài cứng - hàm scan_identity()
+     Dò các thông tin xác thực cố định như tài khoản, mã client, mã tenant.
+     Danh sách mẫu nằm trong hằng IDENTITY_PATTERNS.
+
+2.3. Quét lỗ hổng bằng Bandit - hàm scan_bandit()
+     Gọi công cụ Bandit phân tích mã Python trong project.
+     Lệnh tương đương: python -m bandit -q -r .
+
+2.4. Kiểm tra quyền truy cập file - hàm check_permissions()
+     - Linux/macOS: dùng stat, báo lỗi nếu file có bit world-writable hoặc
+       group-writable (quyền ghi quá thoáng).
+     - Windows: dùng icacls, báo lỗi nếu quyền ghi đang mở cho Everyone.
+
+2.5. Kiểm tra tuân thủ giấy phép - hàm check_license()
+     Báo lỗi nếu thư mục dự án thiếu file LICENSE / LICENSE.md / COPYING.
+
+2.6. Chặn commit
+     Hàm main() trả về mã 1 khi có bất kỳ phát hiện nào. Git nhận mã thoát
+     khác 0 nên hủy commit. Trả về 0 nghĩa là cho phép commit đi tiếp.
+
+2.7. Ghi log
+     Mọi lần chạy đều ghi vào gitsecure.log theo chế độ ghi nối tiếp
+     (append), nên xem được toàn bộ lịch sử kiểm tra.
+
+2.8. Phạm vi quét
+     Hook quét toàn bộ thư mục Lab2. Bỏ qua: file .example, file .log, thư mục
+     .git, __pycache__, .venv, venv, .pytest_cache.
+
+--------------------------------------------------------------------------------
+3. CÁCH DÙNG
+--------------------------------------------------------------------------------
+Bước 1 - Cài thư viện (chạy một lần):
+    cd "Buoi1\Lab2"
+    python -m pip install -r requirements.txt
+
+Bước 2 - Bật hook cho Git (chạy một lần, tại gốc repository):
+    cd <goc repository>
+    git config core.hooksPath "Buoi1/Lab2/.githooks"
+
+    Kiểm tra lại:
+    git config core.hooksPath
+    -> Buoi1/Lab2/.githooks
+
+Bước 3 - Làm việc bình thường:
+    git add .
+    git commit -m "noi dung commit"
+    Hook tự chạy trước khi commit được tạo. Không cần gọi thủ công.
+
+Ba lưu ý quan trọng:
+    - Hook chạy khi COMMIT, KHÔNG chạy khi PUSH.
+    - File gitsecure.log đã nằm trong .gitignore nên không được push lên GitHub.
+    - Cấu hình core.hooksPath nằm trong .git/config, chỉ có trên máy của bạn,
+      KHÔNG được push lên GitHub. Máy khác clone về phải chạy lại Bước 2.
+
+--------------------------------------------------------------------------------
+4. CÁCH KIỂM THỬ
+--------------------------------------------------------------------------------
+4.1. Kiểm thử tự động bằng unit test
+    cd "Buoi1\Lab2"
+    python -m unittest discover tests
+
+4.2. Chạy hook thủ công (không tạo commit)
+    cd "Buoi1\Lab2"
+    python .githooks\pre-commit
+
+4.3. Chạy hook qua Git nhưng không tạo commit
+    cd <goc repository>
+    git hook run pre-commit
+
+4.4. Kiểm thử trường hợp BỊ CHẶN
+    cd "Buoi1\Lab2"
+    copy examples\unsafe_sample.py.example examples\unsafe_sample.py
+    cd <goc repository>
+    git hook run pre-commit
+
+    Kiểm tra xong thì xoá file mẫu:
+    del "Buoi1\Lab2\examples\unsafe_sample.py"
+
+    Ghi chú: file unsafe_sample.py đã bị .gitignore bỏ qua, nhưng hook vẫn
+    phát hiện, vì hook quét theo THƯ MỤC chứ không theo danh sách file staged.
+
+4.5. Xem kết quả đã ghi trong log
+    cd "Buoi1\Lab2"
+    type gitsecure.log
+
+--------------------------------------------------------------------------------
+5. KẾT QUẢ VÀ Ý NGHĨA
+--------------------------------------------------------------------------------
+5.1. Kết quả kiểm thử tự động
+    .....
+    ----------------------------------------------------------------------
+    Ran 5 tests in 0.041s
+
+    OK
+
+    Ý nghĩa: cả 5 test đều đạt. Dấu chấm là một test pass, dòng OK là toàn bộ
+    bộ test đã qua, không có test nào lỗi.
+
+5.2. Kết quả khi dữ liệu sạch
+    GitSecure: Không phát hiện rủi ro bảo mật.
+    Kết quả đã ghi vào: ...\Lab2\gitsecure.log
+    Mã thoát: 0
+
+    Ý nghĩa: không có rủi ro bảo mật, commit được phép đi tiếp.
+
+5.3. Kết quả khi có dữ liệu rủi ro
+    GitSecure chặn commit vì phát hiện rủi ro bảo mật:
+    - Sensitive info found in .\examples\unsafe_sample.py: pattern ...
+    - Hardcoded identity found in .\examples\unsafe_sample.py: pattern ...
+    - Bandit found security issues. Run: python -m bandit -r .
+    Mã thoát: 1
+
+    Ý nghĩa: commit BỊ HỦY. Người dùng phải xoá hoặc sửa dữ liệu nhạy cảm
+    rồi commit lại.
+
+5.4. Ý nghĩa của file log gitsecure.log
+    Mỗi dòng có dạng: [thời gian] nội dung
+
+    Các dòng kết luận:
+        PASS no security issues found   -> không có rủi ro, cho phép commit
+        FAIL commit blocked             -> có rủi ro, chặn commit
+
+    Các dòng chi tiết vi phạm:
+        Sensitive info found in <file>: pattern <regex>
+            -> file chứa API key, secret, mật khẩu hoặc token viết cứng
+        Hardcoded identity found in <file>: pattern <regex>
+            -> file chứa thông tin định danh cài cứng
+        Bandit found security issues...
+            -> Bandit phát hiện vấn đề bảo mật trong mã Python
+        Missing license file...
+            -> dự án thiếu file giấy phép
+        Weak file permission ... in <file>
+            -> quyền truy cập file quá thoáng
+
+    Ví dụ log thực tế đã ghi trong máy:
+        [2026-09-23 15:46:49] PASS no security issues found
+        [2026-09-23 15:46:54] FAIL commit blocked
+        [2026-09-23 15:46:54] Sensitive info found in ...
+        [2026-09-23 15:46:54] Hardcoded identity found in ...
+        [2026-09-23 15:46:54] Bandit found security issues...
+        [2026-09-23 15:47:07] PASS no security issues found
+
+    Cách đọc: dòng 15:46:49 dữ liệu sạch nên hook cho qua. Dòng 15:46:54 có
+    file rủi ro nên hook chặn và ghi rõ 3 lý do. Từ 15:47:07 sau khi xoá file
+    rủi ro, mọi lần chạy đều PASS.
+
+    Ý nghĩa tổng quát: log là bằng chứng cho thấy hook đã chạy, biết được lúc
+    nào bị chặn, file nào vi phạm, vi phạm quy tắc nào. Log phục vụ truy vết
+    và sửa lỗi sau khi commit bị hủy. Đây là yêu cầu bắt buộc trong mục 1.4.1
+    của giáo trình: "Hệ thống cần tạo một tệp log ghi lại chi tiết các phát
+    hiện (findings) phục vụ việc xem xét và xử lý sau đó."
+
+5.5. Giá trị thực tế của kết quả
+    - Ngăn chặn lộ API key, mật khẩu, token lên GitHub.
+    - Phát hiện lỗi bảo mật ngay lúc commit, trước khi lọt vào lịch sử Git.
+    - Tự động hoá kiểm tra bảo mật, không phụ thuộc vào kiểm tra thủ công.
+    - Tạo thói quen làm việc an toàn trong quy trình phát triển phần mềm.
+
+--------------------------------------------------------------------------------
+6. GIỚI HẠN CẦN BIẾT
+--------------------------------------------------------------------------------
+- Regex nhận diện chỉ ở mức cơ bản, phục vụ mục đích học tập. Môi trường thật
+  nên dùng thêm GitLeaks, TruffleHog hoặc detect-secrets.
+- Mẫu apikey trong giáo trình không bắt được dạng có dấu gạch dưới như
+  API_KEY. Muốn bắt thì sửa thành api[_-]?key.
+- Bandit chỉ phân tích mã Python, không phân tích ngôn ngữ khác.
+- Hook bị bỏ qua nếu commit bằng tuỳ chọn --no-verify.
+
+================================================================================
