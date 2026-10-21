@@ -56,18 +56,20 @@ Buoi5_21_10_26/
 │       ├── test_security_behavior_checker.py
 │       └── test_virtual_sandbox.py
 │
-├── screenshots/                    # Ảnh minh chứng chạy thực tế theo slide
-│   ├── docx_img_1.png              # Hình 1: SAST Unit Test (6/6 OK)
-│   ├── docx_img_2.png              # Hình 2: Quét vulnerable_01.py
-│   ├── docx_img_3.png              # Hình 3: Cài đặt extension SARIF Viewer
-│   ├── docx_img_4.png              # Hình 4: Giao diện SARIF Results trong VS Code
-│   ├── docx_img_5.png              # Hình 5: Quét vulnerable_02.py
-│   ├── docx_img_6.png              # Hình 6: Push code SAST lên GitHub
-│   ├── docx_img_7.png              # Hình 7: DAST Unit Test (5/5 OK)
-│   ├── docx_img_8.png              # Hình 8: Chạy file main.py
-│   ├── docx_img_9.png              # Hình 9: Khởi động Flask API
-│   ├── docx_img_10.png             # Hình 10: Kiểm tra 5 API endpoints
-│   └── docx_img_11.png             # Hình 11: Push code DAST lên GitHub
+├── screenshots/                    # Ảnh minh chứng chạy thực tế theo slide & file báo cáo
+│   ├── docx_img_1.png              # SAST: Unit Test (6/6 OK)
+│   ├── docx_img_2.png              # SAST: Quét vulnerable_01.py
+│   ├── docx_img_3.png              # SAST: Cài đặt extension SARIF Viewer
+│   ├── docx_img_4.png              # SAST: Giao diện SARIF Results trong VS Code
+│   ├── docx_img_5.png              # SAST: Quét vulnerable_02.py
+│   ├── docx_img_6.png              # SAST: Push code lên GitHub
+│   ├── dast_unit_test.png          # DAST: Chạy Unit Test (5/5 OK)
+│   ├── dast_main_run.png           # DAST: Chạy file main.py
+│   ├── dast_flask_api.png          # DAST: Khởi động máy chủ Flask API
+│   ├── dast_api_monitor.png        # DAST: Kiểm tra API endpoint /api/monitor
+│   ├── dast_api_memory.png         # DAST: Kiểm tra API endpoint /api/memory
+│   ├── dast_api_network.png        # DAST: Kiểm tra API endpoint /api/network
+│   └── docx_img_11.png             # Push code lên GitHub
 │
 ├── BaoCaoTuan 5.docx               # Báo cáo thực hành hoàn chỉnh dạng Word
 └── README.md                       # Tài liệu hướng dẫn chi tiết
@@ -172,7 +174,7 @@ python -m unittest discover -s tests
 ```
 *Kết quả:* Toàn bộ **5/5 tests PASS (OK)**.
 
-![Hình 7: Chạy Unit Test DAST](screenshots/docx_img_7.png)
+![Chạy Unit Test](screenshots/dast_unit_test.png)
 
 ### 4.3. Chạy kiểm thử CLI độc lập (`main.py`)
 Thực thi trực tiếp file `main.py` để xem thông số giám sát tức thì của tiến trình:
@@ -180,19 +182,19 @@ Thực thi trực tiếp file `main.py` để xem thông số giám sát tức t
 python main.py
 ```
 
-![Hình 8: Chạy file main.py](screenshots/docx_img_8.png)
+![Chạy file “main.py”](screenshots/dast_main_run.png)
 
 ### 4.4. Khởi chạy REST API Server (`app.py`)
 Khởi chạy dịch vụ API giám sát:
 ```bash
 python app.py
 ```
-Mặc định ứng dụng chạy tại: `http://localhost:5000`
+Mặc định ứng dụng chạy tại: `http://127.0.0.1:5000`
 
-![Hình 9: Khởi động Flask API](screenshots/docx_img_9.png)
+![Khởi động máy chủ Flask API](screenshots/dast_flask_api.png)
 
 ### 4.5. Kiểm tra các API Endpoints
-Kiểm tra toàn bộ 5 endpoints REST API qua `curl` hoặc PowerShell `Invoke-RestMethod`:
+Kiểm tra các endpoints REST API qua `curl` (hoặc PowerShell `Invoke-RestMethod`):
 
 | Phương thức | Đường dẫn URL | Mô tả chức năng | Dữ liệu đầu vào (Body) |
 |---|---|---|---|
@@ -202,21 +204,34 @@ Kiểm tra toàn bộ 5 endpoints REST API qua `curl` hoặc PowerShell `Invoke-
 | **GET** | `/api/security` | Kiểm tra phát hiện các syscalls/hàm nhạy cảm | Không |
 | **POST** | `/api/sandbox` | Thực thi lệnh bất kỳ trong Virtual Sandbox cô lập | JSON: `{"command": "echo test"}` |
 
-#### Câu lệnh kiểm tra mẫu:
+#### a) Kiểm tra API endpoint `/api/monitor`:
 ```bash
-curl -X GET http://localhost:5000/api/monitor
-curl -X GET http://localhost:5000/api/memory
-curl -X GET http://localhost:5000/api/network
-curl -X GET http://localhost:5000/api/security
-curl -X POST http://localhost:5000/api/sandbox -H "Content-Type: application/json" -d "{\"command\": \"echo test\"}"
+curl http://127.0.0.1:5000/api/monitor
 ```
+*Kết quả trả về JSON chứa `cpu_percent`, `memory_usage` và `open_files` của tiến trình:*
 
-![Hình 10: Kiểm tra các API](screenshots/docx_img_10.png)
+![Kiểm tra API endpoint /api/monitor](screenshots/dast_api_monitor.png)
+
+#### b) Kiểm tra API endpoint `/api/memory`:
+```bash
+curl http://127.0.0.1:5000/api/memory
+```
+*Kết quả trả về danh sách đối tượng rò rỉ (`leaked_objects`) và kiểm tra tràn số nguyên (`overflow_test: true`):*
+
+![Kiểm tra API endpoint /api/memory](screenshots/dast_api_memory.png)
+
+#### c) Kiểm tra API endpoint `/api/network`:
+```bash
+curl http://127.0.0.1:5000/api/network
+```
+*Kết quả trả về thống kê lưu lượng mạng `bytes_sent`, `bytes_recv`, `packets_sent`, `packets_recv` trên các giao diện mạng:*
+
+![Kiểm tra API endpoint /api/network](screenshots/dast_api_network.png)
 
 ### 4.6. Push mã nguồn DAST lên GitHub
-Đóng gói và đẩy toàn bộ mã nguồn công cụ DAST lên remote repository:
+Đóng gói và đẩy toàn bộ mã nguồn công cụ DAST lên remote repository GitHub:
 
-![Hình 11: Push code DAST lên github](screenshots/docx_img_11.png)
+![Push code lên github](screenshots/docx_img_11.png)
 
 ---
 
