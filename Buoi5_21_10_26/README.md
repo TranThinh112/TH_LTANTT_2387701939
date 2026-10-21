@@ -68,8 +68,7 @@ Buoi5_21_10_26/
 │   ├── dast_flask_api.png          # DAST: Khởi động máy chủ Flask API
 │   ├── dast_api_monitor.png        # DAST: Kiểm tra API endpoint /api/monitor
 │   ├── dast_api_memory.png         # DAST: Kiểm tra API endpoint /api/memory
-│   ├── dast_api_network.png        # DAST: Kiểm tra API endpoint /api/network
-│   └── docx_img_11.png             # Push code lên GitHub
+│   └── dast_git_push.png           # DAST: Push mã nguồn lên GitHub
 │
 ├── BaoCaoTuan 5.docx               # Báo cáo thực hành hoàn chỉnh dạng Word
 └── README.md                       # Tài liệu hướng dẫn chi tiết
@@ -220,18 +219,10 @@ curl http://127.0.0.1:5000/api/memory
 
 ![Kiểm tra API endpoint /api/memory](screenshots/dast_api_memory.png)
 
-#### c) Kiểm tra API endpoint `/api/network`:
-```bash
-curl http://127.0.0.1:5000/api/network
-```
-*Kết quả trả về thống kê lưu lượng mạng `bytes_sent`, `bytes_recv`, `packets_sent`, `packets_recv` trên các giao diện mạng:*
-
-![Kiểm tra API endpoint /api/network](screenshots/dast_api_network.png)
-
 ### 4.6. Push mã nguồn DAST lên GitHub
 Đóng gói và đẩy toàn bộ mã nguồn công cụ DAST lên remote repository GitHub:
 
-![Push code lên github](screenshots/docx_img_11.png)
+![Push code DAST lên GitHub](screenshots/dast_git_push.png)
 
 ---
 
