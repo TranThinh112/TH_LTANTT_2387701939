@@ -11,3 +11,6 @@ gitsecure.log
 certs/
 *.pem
 .env
+*.bak
+~$*
+*.tmp

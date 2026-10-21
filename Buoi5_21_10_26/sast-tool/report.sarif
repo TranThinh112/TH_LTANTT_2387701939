@@ -93,7 +93,7 @@
                   "description": null,
                   "index": -1,
                   "properties": null,
-                  "uri": ".\\examples\\vulnerable_02.py",
+                  "uri": "examples/vulnerable_02.py",
                   "uri_base_id": null
                 },
                 "context_region": null,
@@ -139,7 +139,7 @@
             "id": null,
             "markdown": null,
             "properties": null,
-            "text": ".\\examples\\vulnerable_02.py:5:1: E302 expected 2 blank lines, found 1"
+            "text": "examples/vulnerable_02.py:5:1: E302 expected 2 blank lines, found 1"
           },
           "analysis_target": null,
           "attachments": null,
@@ -166,7 +166,7 @@
                   "description": null,
                   "index": -1,
                   "properties": null,
-                  "uri": ".\\examples\\vulnerable_02.py",
+                  "uri": "examples/vulnerable_02.py",
                   "uri_base_id": null
                 },
                 "context_region": null,
@@ -212,7 +212,7 @@
             "id": null,
             "markdown": null,
             "properties": null,
-            "text": ".\\examples\\vulnerable_02.py:10:1: E302 expected 2 blank lines, found 1"
+            "text": "examples/vulnerable_02.py:10:1: E302 expected 2 blank lines, found 1"
           },
           "analysis_target": null,
           "attachments": null,
@@ -239,7 +239,7 @@
                   "description": null,
                   "index": -1,
                   "properties": null,
-                  "uri": ".\\examples\\vulnerable_02.py",
+                  "uri": "examples/vulnerable_02.py",
                   "uri_base_id": null
                 },
                 "context_region": null,
@@ -285,7 +285,7 @@
             "id": null,
             "markdown": null,
             "properties": null,
-            "text": ".\\examples\\vulnerable_02.py:13:1: E305 expected 2 blank lines after class or function definition, found 1"
+            "text": "examples/vulnerable_02.py:13:1: E305 expected 2 blank lines after class or function definition, found 1"
           },
           "analysis_target": null,
           "attachments": null,
@@ -312,7 +312,7 @@
                   "description": null,
                   "index": -1,
                   "properties": null,
-                  "uri": ".\\examples\\vulnerable_02.py",
+                  "uri": "examples/vulnerable_02.py",
                   "uri_base_id": null
                 },
                 "context_region": null,

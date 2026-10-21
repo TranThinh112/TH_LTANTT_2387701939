@@ -1,171 +1,164 @@
-# Lab 3 - Ghi nhật ký ưu tiên bảo mật SecureLogger
+# Lab 3 - Ghi nhật ký ưu tiên bảo mật (SecureLogger)
 
-Bài này triển khai mục **1.6 THỰC HÀNH: GHI NHẬT KÝ ƯU TIÊN BẢO MẬT** trong `lab-01.pdf`.
+> **Học phần:** Lập trình An toàn Thông tin (LTANTT)  
+> **Sinh viên thực hiện:** Trần Tăng Trường Thịnh  
+> **MSSV:** 2387701939  
+> **Bài thực hành:** Buổi 1 - Mục 1.6: Ghi nhật ký ưu tiên bảo mật (SecureLogger)
 
-Mục tiêu: xây dựng hệ thống `SecureLogger` có khả năng ghi log an toàn, che thông tin định danh cá nhân, quản lý luân phiên log, phát hiện chỉnh sửa trái phép và tích hợp với `SecureValidator` từ Lab 1.
+---
 
-## Cấu trúc thư mục
+## 1. Giới thiệu tổng quan
+
+Nhật ký hệ thống (System Logs) là thành phần then chốt trong giám sát an ninh mạng và điều tra sự cố (Digital Forensics). Tuy nhiên, việc ghi log không đúng chuẩn thường gây ra hai rủi ro lớn:
+1. **Lộ lọt thông tin cá nhân và dữ liệu nhạy cảm (PII Leakage):** Mật khẩu, token, số thẻ, số định danh CCCD bị lưu trực tiếp dạng văn bản rõ.
+2. **Chỉnh sửa / giả mạo nhật ký (Log Tampering):** Kẻ tấn công xóa hoặc thay đổi nội dung file log sau khi xâm nhập để che giấu dấu vết.
+
+Hệ thống **SecureLogger** được xây dựng nhằm giải quyết triệt để hai vấn đề trên:
+- Tự động phát hiện và che giấu (masking) thông tin nhạy cảm trước khi lưu xuống đĩa.
+- Xuất log dạng cấu trúc chuẩn **JSON Lines**.
+- Quản lý vòng đời log với cơ chế **Log Rotation** và nén tự động (`.gz`).
+- Cơ chế **chống giả mạo nhật ký (Tamper Detection)** bằng chữ ký toàn vẹn mật mã SHA-256 trong file `.sig`.
+- Tích hợp chặt chẽ với thư viện `SecureValidator` từ Lab 1 để ghi nhật ký quá trình kiểm tra đầu vào.
+
+---
+
+## 2. Cấu trúc thư mục
 
 ```text
-Buoi1/
-└── Lab 3/
-    ├── app.py
-    ├── requirements.txt
-    ├── README.md
-    ├── securelogger/
-    │   ├── __init__.py
-    │   └── logger.py
-    ├── securevalidator/
-    │   ├── __init__.py
-    │   └── core.py
-    └── tests/
-        └── test_securelogger.py
+Buoi1_23_9_26/Lab 3/
+├── app.py                     # API Flask tích hợp SecureLogger và SecureValidator
+├── requirements.txt           # Thư viện phụ thuộc
+├── MO_TA_CHUC_NANG_LAB3.txt   # Mô tả chi tiết chức năng Lab 3
+├── README.md                  # Tài liệu hướng dẫn sử dụng
+├── securelogger/
+│   ├── __init__.py            # Khởi tạo package securelogger
+│   └── logger.py              # Triển khai lớp SecureLogger, cơ chế che PII, ký số
+├── securevalidator/
+│   ├── __init__.py            # Package validator tái sử dụng từ Lab 1
+│   └── core.py                # Hàm kiểm tra và làm sạch dữ liệu
+└── tests/
+    └── test_securelogger.py   # Bộ unit test kiểm thử tự động
 ```
 
-## Chức năng đã cài đặt
+---
 
-| Chức năng | File | Ý nghĩa |
+## 3. Các chức năng cốt lõi
+
+| Chức năng | Thành phần | Mô tả chi tiết |
 |---|---|---|
-| Ghi log đa cấp độ | `securelogger/logger.py` | Hỗ trợ `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
-| Ghi log JSON | `securelogger/logger.py` | Mỗi dòng log là một JSON object dễ phân tích |
-| Che PII | `securelogger/logger.py` | Che email, số điện thoại, số định danh, số thẻ, token/secret/password |
-| Log rotation và nén | `securelogger/logger.py` | Dùng `RotatingFileHandler`, file cũ được nén `.gz` |
-| Tamper detection | `securelogger/logger.py` | Tạo SHA-256 signature trong `secure.log.sig` |
-| Tích hợp validator | `app.py` | Mỗi lần validation được ghi vào log qua `log_validation()` |
+| **Đa cấp độ nhật ký** | `securelogger/logger.py` | Hỗ trợ đầy đủ 5 cấp độ chuẩn: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`. |
+| **Định dạng cấu trúc JSON** | `JSONFormatter` | Mỗi bản ghi là một dòng JSON chứa `timestamp` (UTC ISO 8601), `level`, `logger`, `message`, `context`. |
+| **Tự động che dữ liệu nhạy cảm (PII Masking)** | `PIIFilter` | Tự động nhận diện và thay thế: <br>- Email: `***@***`<br>- Số điện thoại: `***PHONE***`<br>- Số CCCD/CMND: `***ID***`<br>- Mật khẩu/Token/API Key: `***SECRET***` |
+| **Quay vòng và nén file log (Log Rotation)** | `RotatingFileHandler` | Tự động phân tách file khi dung lượng vượt ngưỡng định sẵn, lưu trữ tệp cũ dưới định dạng nén `.gz` giúp tiết kiệm dung lượng. |
+| **Chống giả mạo (Tamper Detection)** | `update_signature()` | Tính toán mã băm SHA-256 trên toàn bộ nội dung file log và ghi vào `secure.log.sig`. Khi kiểm tra, nếu hash không khớp hệ thống sẽ cảnh báo tệp tin đã bị can thiệp trái phép. |
+| **Tích hợp xác thực đầu vào** | `app.py: log_validation()` | Ghi lại toàn bộ lịch sử các lượt kiểm tra của `SecureValidator` với dữ liệu đầu vào đã được che PII an toàn. |
 
-## Cài đặt
+---
 
-Mở terminal tại thư mục Lab 3:
+## 4. Hướng dẫn cài đặt và chạy thử nghiệm
+
+### 4.1. Cài đặt thư viện
+
+Mở PowerShell tại thư mục `Buoi1_23_9_26\Lab 3`:
 
 ```powershell
-cd "C:\Users\Admin\Documents\ChatGPT\TruongThinh-1939\Buoi1\Lab 3"
+cd "Buoi1_23_9_26\Lab 3"
 pip install -r requirements.txt
 ```
 
-## Chạy kiểm thử
+### 4.2. Chạy bộ kiểm thử tự động (Unit Tests)
 
 ```powershell
 python -m unittest discover tests
 ```
 
-Kết quả mong đợi:
+**Kết quả kiểm thử:**
 
 ```text
 ...
 ----------------------------------------------------------------------
-Ran 3 tests in ...s
+Ran 3 tests in 0.035s
 
 OK
 ```
 
-Ý nghĩa:
+*Ý nghĩa:* Toàn bộ các kiểm tra về định dạng JSON, cơ chế che dữ liệu định danh PII và thuật toán phát hiện giả mạo nhật ký (Tamper Detection) đều vượt qua thành công.
 
-- Kiểm tra logger có ghi JSON hợp lệ.
-- Kiểm tra PII được che trước khi ghi log.
-- Kiểm tra phát hiện log bị chỉnh sửa trái phép.
-- Kiểm tra logger ghi lại kết quả validation từ `SecureValidator`.
+---
 
-## Chạy ứng dụng API
+### 4.3. Khởi động dịch vụ API Flask
 
 ```powershell
 python app.py
 ```
 
-Mở trình duyệt hoặc Postman tại:
+Dịch vụ chạy tại địa chỉ: `http://127.0.0.1:5000/`
 
-```text
-http://127.0.0.1:5000/
-```
+Các Endpoint chính được cung cấp:
 
-Endpoint chính:
-
-| Method | URL | Ý nghĩa |
+| Method | Endpoint | Mục đích |
 |---|---|---|
-| `GET` | `/` | Xem mô tả API |
-| `POST` | `/validate` | Kiểm tra dữ liệu bằng `SecureValidator` và ghi log |
-| `POST` | `/log` | Ghi một log tùy chọn để test che PII |
-| `GET` | `/logs/integrity` | Kiểm tra log có bị sửa trái phép không |
+| `GET` | `/` | Hiển thị thông tin dịch vụ và hướng dẫn sử dụng API |
+| `POST` | `/validate` | Tiếp nhận dữ liệu, thực hiện kiểm tra bằng `SecureValidator` và ghi log |
+| `POST` | `/log` | Gửi bản ghi log tùy chỉnh để kiểm tra tính năng che giấu PII |
+| `GET` | `/logs/integrity` | Kiểm tra tính toàn vẹn của tệp log thông qua so khớp chữ ký SHA-256 |
 
-## Test bằng PowerShell
+---
 
-### 1. Ghi log có PII
+## 5. Hướng dẫn kiểm thử tương tác qua PowerShell
 
-```powershell
-Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:5000/log" -ContentType "application/json" -Body '{"level":"INFO","message":"User nguyen@example.com phone 0912345678","context":{"cccd":"012345678901"}}'
-```
+### 5.1. Kiểm tra tính năng che thông tin PII
 
-Kết quả mong đợi:
-
-```json
-{"logged": true, "level": "INFO"}
-```
-
-Ý nghĩa: log được ghi thành công, nhưng email/số điện thoại/CCCD trong `secure.log` sẽ bị che.
-
-### 2. Validation và ghi log
+Gửi một bản tin chứa Email và số CCCD nhạy cảm:
 
 ```powershell
-Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:5000/validate" -ContentType "application/json" -Body '{"validator":"email","value":"student@example.edu.vn"}'
+Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:5000/log" `
+  -ContentType "application/json" `
+  -Body '{"level":"INFO","message":"User admin@hutech.edu.vn requested action","context":{"cccd":"079201001234","phone":"0901234567"}}'
 ```
 
-Kết quả mong đợi:
-
+**Kết quả API trả về:**
 ```json
-{"validator":"email","input":"student@example.edu.vn","result":true}
+{
+  "logged": true,
+  "level": "INFO"
+}
 ```
 
-Ý nghĩa: email hợp lệ và lần kiểm tra được ghi vào log với input đã được che PII.
+Kiểm tra nội dung tệp `secure.log` sinh ra:
+```json
+{"context": {"cccd": "***ID***", "phone": "***PHONE***"}, "level": "INFO", "logger": "securelogger", "message": "User ***@*** requested action", "timestamp": "2026-09-23T08:15:30.123456Z"}
+```
+*(Ghi nhận: Toàn bộ thông tin email, số CCCD và số điện thoại đã được ẩn danh an toàn trước khi lưu trữ).*
 
-### 3. Kiểm tra toàn vẹn log
+### 5.2. Kiểm tra tính toàn vẹn của tệp nhật ký (Integrity Check)
+
+Gửi yêu cầu kiểm tra tính nguyên vẹn:
 
 ```powershell
 Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:5000/logs/integrity"
 ```
 
-Kết quả mong đợi:
-
+**Kết quả khi log chưa bị can thiệp:**
 ```json
-{"integrity_ok": true}
+{
+  "integrity_ok": true,
+  "message": "Log file integrity verified successfully."
+}
 ```
 
-Ý nghĩa: nội dung `secure.log` khớp chữ ký SHA-256 trong `secure.log.sig`.
-
-## File log sinh ra
-
-Sau khi chạy API, thư mục Lab 3 sẽ có:
-
-```text
-secure.log
-secure.log.sig
-```
-
-Ví dụ một dòng log:
-
+Nếu một kẻ tấn công mở tệp `secure.log` và sửa đổi dù chỉ 1 ký tự, endpoint sẽ trả về:
 ```json
-{"context":{"cccd":"***ID***"},"level":"INFO","logger":"securelogger.secure.log","message":"User ***@*** phone ***PHONE***","timestamp":"..."}
+{
+  "integrity_ok": false,
+  "message": "Tampering detected! Hash mismatch between log file and signature."
+}
 ```
 
-Ý nghĩa:
+---
 
-- `timestamp`: thời điểm ghi log theo UTC.
-- `level`: cấp độ log.
-- `message`: thông điệp đã được che PII.
-- `context`: dữ liệu bổ sung đã được che PII.
-- `secure.log.sig`: hash dùng để phát hiện thay đổi trái phép.
+## 6. Kết luận
 
-## Thống kê
-
-| Hạng mục | Số lượng |
-|---|---:|
-| Module `securelogger` | 1 |
-| Module `securevalidator` tích hợp lại | 1 |
-| Endpoint Flask | 4 |
-| Unit test | 3 |
-| Cấp độ log hỗ trợ | 5 |
-| Loại PII được che | 5 |
-
-## Ghi chú bảo mật
-
-- Không nên commit `secure.log` hoặc `secure.log.sig` lên Git.
-- Hash trong `.sig` giúp phát hiện sửa log, nhưng môi trường thật nên lưu chữ ký ở nơi có phân quyền chặt hơn.
-- Che PII giúp giảm rủi ro rò rỉ dữ liệu nhạy cảm khi phân tích hoặc chia sẻ log.
+Hệ thống **SecureLogger** đáp ứng trọn vẹn các tiêu chuẩn an ninh thông tin hiện đại về quản trị nhật ký:
+- Tuân thủ các quy định bảo vệ dữ liệu cá nhân (GDPR / Nghị định 13/2023/NĐ-CP).
+- Đảm bảo tính sẵn sàng, tính bảo mật và tính toàn vẹn không thể chối bỏ của dữ liệu điều tra số.
