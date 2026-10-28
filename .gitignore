@@ -14,3 +14,8 @@ certs/
 *.bak
 ~$*
 *.tmp
+node_modules/
+.docusaurus/
+.cache-loader/
+build/
+.npm/
