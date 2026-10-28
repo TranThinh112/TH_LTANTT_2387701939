@@ -2,7 +2,7 @@
 
 - **Học phần:** Thực hành Lập trình An toàn Thông tin
 - **Mã số sinh viên (MSSV):** 2387701939
-- **Họ và tên:** Trường Thịnh
+- **Họ và tên:** Trương Thịnh
 - **GitLab Username:** `ttthinh2005`
 - **GitLab Repository:** `truongthinh-2387701939`
 - **Trang GitLab Pages trực tiếp:** [https://truongthinh-2387701939-fa3ba8.gitlab.io/](https://truongthinh-2387701939-fa3ba8.gitlab.io/)
@@ -103,56 +103,62 @@ deploy-job:
 
 ![Khởi tạo dự án Docusaurus cục bộ](image/Screenshot%202026-10-28%20093425.png)
 
-### Bước 2: Mở dự án trong VS Code & cài đặt gói phụ thuộc
-- Mở thư mục `pipeline-tutorial` bằng Visual Studio Code, kiểm tra cấu trúc thư mục và chạy lệnh cài đặt package nếu cần (`npm install`).
-
-![Mở dự án trong Visual Studio Code](image/Screenshot%202026-10-28%20093710.png)
-
-### Bước 3: Chạy thử nghiệm môi trường phát triển cục bộ (Local Server)
-- Thực thi lệnh:
+### Bước 2: Chạy thử nghiệm môi trường phát triển cục bộ (Local Server)
+- Mở thư mục `pipeline-tutorial` trong Visual Studio Code, khởi chạy server phát triển cục bộ bằng lệnh:
   ```bash
   npm start
   ```
-- Docusaurus server khởi chạy thành công tại `http://localhost:3000`. Giao diện web hiển thị chính xác trên trình duyệt máy tính.
+- Docusaurus server biên dịch và khởi chạy thành công tại cổng local: `http://localhost:3000/`.
 
-![Kiểm tra Docusaurus chạy tại localhost:3000](image/Screenshot%202026-10-28%20093934.png)
+![Khởi chạy server Docusaurus local tại localhost:3000](image/Screenshot%202026-10-28%20093710.png)
 
-### Bước 4: Kiểm tra quá trình Build tĩnh (Production Build)
-- Chạy thử lệnh build tĩnh để kiểm tra tính toàn vẹn của mã nguồn:
-  ```bash
-  npm run build
+### Bước 3: Kiểm tra và chỉnh sửa cấu hình `docusaurus.config.js`
+- Mở file `docusaurus.config.js` để cấu hình thông số tên trang, `url` và `baseUrl` phục vụ việc deploy lên GitLab Pages.
+- Cấu hình địa chỉ url trỏ về trang GitLab Pages:
+  ```javascript
+  url: 'https://truongthinh-2387701939-fa3ba8.gitlab.io',
+  baseUrl: '/',
   ```
-- Docusaurus biên dịch mã nguồn thành công và tạo thư mục chứa website tĩnh tại thư mục `build/`.
 
-![Build tĩnh thành công bằng npm run build](image/Screenshot%202026-10-28%20094039.png)
+![Cấu hình file docusaurus.config.js](image/Screenshot%202026-10-28%20093934.png)
 
-### Bước 5: Cấu hình tệp .gitlab-ci.yml cho Docusaurus & GitLab Pages
-- Tạo tệp `.gitlab-ci.yml` trong thư mục gốc của dự án `pipeline-tutorial` với image Docker `node:18` (hoặc `node:lts`), cấu hình cache `node_modules` và artifact đầu ra thư mục `public/`:
+### Bước 4: Tạo tệp cấu hình `.gitlab-ci.yml` cho dự án Docusaurus
+- Tạo file `.gitlab-ci.yml` trong thư mục gốc của project để định nghĩa 2 stage: `build` (dùng container `node:latest`, chạy `npm install` và `npm run build`) và `pages` (di chuyển thư mục `build/` thành `public/` để GitLab Pages nhận diện):
 
 ```yaml
-image: node:18
+stages:
+  - build
+  - deploy
+
+build-job:
+  stage: build
+  image: node:latest
+  script:
+    - npm install
+    - npm run build
+  artifacts:
+    paths:
+      - "build/"
 
 pages:
   stage: deploy
-  cache:
-    key:
-      files:
-        - package-lock.json
-    paths:
-      - .npm/
-  before_script:
-    - npm ci --cache .npm --prefer-offline
   script:
-    - npm run build
-    - mv build public
+    - mv build/ public/
   artifacts:
     paths:
-      - public
-  only:
-    - main
+      - "public/"
 ```
 
-![Tạo cấu hình CI/CD cho Docusaurus Pages](image/Screenshot%202026-10-28%20094254.png)
+![Tạo cấu hình .gitlab-ci.yml cho Docusaurus](image/Screenshot%202026-10-28%20094039.png)
+
+### Bước 5: Chạy thử lệnh `npm run build` kiểm tra đóng gói cục bộ
+- Thực hiện chạy lệnh build trên terminal:
+  ```bash
+  npm run build
+  ```
+- Docusaurus đóng gói thành công mã nguồn tĩnh vào thư mục `build/` mà không phát sinh lỗi cú pháp hay thiếu plugin.
+
+![Kiểm tra build tĩnh bằng npm run build thành công](image/Screenshot%202026-10-28%20094254.png)
 
 ### Bước 6: Đẩy mã nguồn từ máy tính lên GitLab Repository
 - Liên kết remote repository GitLab và đẩy toàn bộ source code lên nhánh `main`:
@@ -170,19 +176,12 @@ pages:
 ![Pipeline tự động được kích hoạt trên GitLab](image/Screenshot%202026-10-28%20094610.png)
 
 ### Bước 8: Kiểm tra chi tiết log thực thi của Job `pages`
-- Nhấp vào job `pages` để theo dõi tiến trình thực tế: các bước tải image node, restore cache, chạy lệnh `npm run build`, di chuyển `build` sang `public` và upload artifacts đều kết thúc với mã thoát `Job succeeded`.
+- Nhấp vào job `pages` để theo dõi tiến trình thực tế: các bước tải container, chạy lệnh build, di chuyển thư mục `build/` sang `public/` và upload artifacts đều hoàn thành thành công (`Job succeeded`).
 
 ![Log chi tiết của job pages thành công](image/Screenshot%202026-10-28%20094654.png)
 
 ### Bước 9: Thiết lập và kiểm tra đường dẫn GitLab Pages
 - Truy cập vào **Deploy** -> **Pages** trong repository GitLab để lấy đường dẫn website được xuất bản: `https://truongthinh-2387701939-fa3ba8.gitlab.io/`.
-- **Lưu ý cấu hình URL & BaseUrl trong `docusaurus.config.js`:**
-  - Nếu dự án nằm ở root domain của GitLab Pages, cấu hình:
-    ```js
-    url: 'https://truongthinh-2387701939-fa3ba8.gitlab.io',
-    baseUrl: '/',
-    ```
-  - Cấu hình chuẩn xác giúp tránh lỗi vỡ giao diện (404 CSS/JS/Assets).
 
 ![Kiểm tra cấu hình Pages URL trên GitLab](image/Screenshot%202026-10-28%20094751.png)
 
@@ -206,10 +205,10 @@ pages:
 | 6 | `Screenshot 2026-10-28 085212.png` | Commit tệp `.gitlab-ci.yml` lên branch main | Hoàn thành |
 | 7 | `Screenshot 2026-10-28 085456.png` | Pipeline 3 stage (`build`, `test`, `deploy`) Passed | Hoàn thành |
 | 8 | `Screenshot 2026-10-28 093425.png` | Khởi tạo dự án Docusaurus bằng `npx` | Hoàn thành |
-| 9 | `Screenshot 2026-10-28 093710.png` | Cài đặt và mở dự án Docusaurus trong VS Code | Hoàn thành |
-| 10 | `Screenshot 2026-10-28 093934.png` | Khởi chạy server local `npm start` trên port 3000 | Hoàn thành |
-| 11 | `Screenshot 2026-10-28 094039.png` | Kiểm tra lệnh `npm run build` tạo thư mục static | Hoàn thành |
-| 12 | `Screenshot 2026-10-28 094254.png` | Viết cấu hình `.gitlab-ci.yml` triển khai Pages | Hoàn thành |
+| 9 | `Screenshot 2026-10-28 093710.png` | Chạy lệnh `npm start` khởi động server Docusaurus localhost:3000 | Hoàn thành |
+| 10 | `Screenshot 2026-10-28 093934.png` | Cấu hình tham số `url` và `baseUrl` trong `docusaurus.config.js` | Hoàn thành |
+| 11 | `Screenshot 2026-10-28 094039.png` | Viết cấu hình `.gitlab-ci.yml` (build và pages deploy) | Hoàn thành |
+| 12 | `Screenshot 2026-10-28 094254.png` | Chạy thử nghiệm lệnh `npm run build` đóng gói static cục bộ | Hoàn thành |
 | 13 | `Screenshot 2026-10-28 094412.png` | Commit và push toàn bộ source code lên GitLab | Hoàn thành |
 | 14 | `Screenshot 2026-10-28 094610.png` | Pipeline Pages chạy tự động trên GitLab | Hoàn thành |
 | 15 | `Screenshot 2026-10-28 094654.png` | Log thực thi chi tiết của job `pages` thành công | Hoàn thành |
