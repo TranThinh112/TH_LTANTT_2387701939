@@ -9,7 +9,7 @@
 
 ## 📌 Tổng quan mục lục các buổi thực hành
 
-Hệ thống kho lưu trữ tổng hợp các bài thực hành chuyên sâu từ lập trình bảo mật mã nguồn, mật mã học ứng dụng, bảo mật mạng, đến an toàn ứng dụng Web và API:
+Hệ thống kho lưu trữ tổng hợp các bài thực hành chuyên sâu từ lập trình bảo mật mã nguồn, mật mã học ứng dụng, bảo mật mạng, đến an toàn ứng dụng Web, API và DevSecOps / CI-CD:
 
 | Buổi học | Chủ đề trọng tâm | Các công cụ / Module triển khai | Tài liệu chi tiết |
 |---|---|---|---|
@@ -17,6 +17,8 @@ Hệ thống kho lưu trữ tổng hợp các bài thực hành chuyên sâu t�
 | **Buổi 2** | **Mật mã ứng dụng & PKI** | - **SecureCrypto Toolkit:** Mã hóa file AES-GCM, Argon2, RSA, Flask API & GUI<br>- **Mini CA:** Hạ tầng khóa công khai X.509, Root CA, Intermediate CA, CRL | [Buoi2_30_9_26/Readme.md](Buoi2_30_9_26/Readme.md) |
 | **Buổi 3** | **Bảo mật mạng & Trinh sát hệ thống** | - **SecureChat:** Chat client-server mã hóa mTLS & AES-256<br>- **NetRecon:** Quét cổng bất đồng bộ, Nmap, Banner Grabbing & Email Alert | [Buoi3_7_10_26/README.md](Buoi3_7_10_26/README.md) |
 | **Buổi 4** | **Bảo mật Web App & API** | - **WebVulnScanner:** Dò quét lỗ hổng Web DAST (XSS, CSRF, SQLi, SSRF)<br>- **JWT Security Tools:** Xác thực API Gateway với JWT Token & OAuth 2.0 | [Buoi 4_14_10_26/README.md](Buoi%204_14_10_26/README.md) |
+| **Buổi 5** | **Kiểm thử bảo mật SAST & DAST** | - **SAST Tool:** Phân tích AST tĩnh, Regex rule, PEP8 Linting, xuất báo cáo chuẩn SARIF 2.1.0<br>- **DAST Tool:** Giám sát tiến trình, phát hiện rò rỉ bộ nhớ, Network & RESTful API | [Buoi5_21_10_26/README.md](Buoi5_21_10_26/README.md) |
+| **Buổi 6** | **DevSecOps & CI/CD Pipeline** | - **GitLab CI/CD Pipeline:** Tự động hóa build, test, deploy với `.gitlab-ci.yml`<br>- **GitLab Pages & Docusaurus:** Triển khai tự động tài liệu tĩnh lên GitLab Pages | [Buoi6_28_10_26/README.md](Buoi6_28_10_26/README.md) |
 
 ---
 
@@ -39,14 +41,25 @@ Hệ thống kho lưu trữ tổng hợp các bài thực hành chuyên sâu t�
 - **[Web Vulnerability Scanner](Buoi%204_14_10_26/web-vuln-scanner/README.md):** Bộ quét lỗ hổng động (DAST) kiểm thử tự động XSS (Reflected XSS với các payload SVG/Script), CSRF (kiểm tra Anti-CSRF Token trong form HTML), SQL Injection và SSRF qua giao diện Web UI.
 - **[JWT Security Tools](Buoi%204_14_10_26/jwt-security-tools/README.md):** Nền tảng xác thực API Gateway bảo vệ tài nguyên nhạy cảm bằng Bearer Token JWT HMAC-SHA256 (`HS256`), phân tách Access Token / Refresh Token và kiểm thử ủy quyền OAuth 2.0.
 
+### 5. Buổi 5: Kiểm thử bảo mật mã nguồn (SAST) & Động (DAST)
+- **[SAST Tool](Buoi5_21_10_26/sast-tool/README.md):** Công cụ phân tích cú pháp tĩnh Abstract Syntax Tree (AST), Regex matching phát hiện Hardcoded Secret, SQLi, Command Injection, kiểm tra chất lượng mã PEP8 và xuất kết quả chuẩn quốc tế SARIF 2.1.0 tương thích GitHub Security.
+- **[DAST Tool](Buoi5_21_10_26/dast-tool/README.md):** Công cụ giám sát hành vi động và sandbox tiến trình, phát hiện rò rỉ tài nguyên bộ nhớ/CPU, bắt gói tin socket/network và cung cấp RESTful API tự động hóa kiểm thử.
+
+### 6. Buổi 6: DevSecOps và Tự động hóa CI/CD với GitLab
+- **[GitLab CI/CD Pipeline & Pages](Buoi6_28_10_26/README.md):** 
+  - Xây dựng quy trình tích hợp và phân phối liên tục (CI/CD) nhiều giai đoạn (`build`, `test`, `deploy`) qua tệp `.gitlab-ci.yml`.
+  - Đóng gói và phát hành ứng dụng web tĩnh Docusaurus tự động qua GitLab Runner lên **GitLab Pages**.
+  - Demo trực tiếp: [https://truongthinh-2387701939-fa3ba8.gitlab.io/](https://truongthinh-2387701939-fa3ba8.gitlab.io/)
+
 ---
 
 ## 🛠️ Yêu cầu môi trường chung
 
 - **Hệ điều hành:** Windows 10/11, Linux hoặc macOS
-- **Ngôn ngữ:** Python 3.10+
+- **Ngôn ngữ:** Python 3.10+, Node.js 18+
 - **Công cụ phụ trợ:**
   - `git`: Quản lý phiên bản mã nguồn
   - `openssl`: Tạo khóa và chứng chỉ X.509
   - `nmap`: Rà quét dịch vụ mạng
-- **Thư viện Python chính:** `cryptography`, `flask`, `argon2-cffi`, `requests`, `pytest`, `pyjwt`, `click`, `beautifulsoup4`.
+  - `GitLab CI/CD`: GitLab Shared Runner & Pages
+- **Thư viện chính:** `cryptography`, `flask`, `argon2-cffi`, `requests`, `pytest`, `pyjwt`, `click`, `beautifulsoup4`, `flake8`, `sarif-om`, `@docusaurus/core`.
